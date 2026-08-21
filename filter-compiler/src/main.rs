@@ -274,7 +274,7 @@ fn build(specs: &[String], out: &Path, report_rejects: bool) -> Result<()> {
             "sha256": format!("{:x}", Sha256::digest(&cosmetic_encoded)),
             "bytes": cosmetic_encoded.len(),
             "cosmetic_rules": cosmetic_db.cosmetic.len(),
-            "scope_exceptions": cosmetic_db.exceptions.len(),
+            "exceptions": cosmetic_db.exceptions.len(),
             "popup_rules": cosmetic_db.network.len(),
         },
         "sources": db.sources,
@@ -320,9 +320,10 @@ fn build(specs: &[String], out: &Path, report_rejects: bool) -> Result<()> {
         dnr["dropped_over_budget"]
     );
     println!(
-        "  cosmetic.rbdb       {:>9} bytes  ({} cosmetic, {} scope exceptions)",
+        "  cosmetic.rbdb       {:>9} bytes  ({} cosmetic, {} popup, {} exceptions)",
         cosmetic_encoded.len(),
         cosmetic_db.cosmetic.len(),
+        cosmetic_db.network.len(),
         cosmetic_db.exceptions.len()
     );
     Ok(())
