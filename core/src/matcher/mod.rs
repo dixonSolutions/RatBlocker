@@ -252,13 +252,14 @@ pub struct MatchContext<'a> {
 /// Do this rule's options permit it to apply to the request?
 fn options_match(rule: &NetworkRule, ctx: &MatchContext<'_>) -> bool {
     let o = &rule.options;
-    if o.resource_mask & ctx.resource_type.mask() == 0 {
-        return false;
+    let resource_matches = o.resource_mask & ctx.resource_type.mask() != 0;
+    match o.popup {
+        Some(true) if !ctx.is_popup && !resource_matches => return false,
+        Some(false) if ctx.is_popup || !resource_matches => return false,
+        None if !resource_matches => return false,
+        _ => {}
     }
     if !o.party.accepts(ctx.party) {
-        return false;
-    }
-    if o.popup.is_some_and(|required| required != ctx.is_popup) {
         return false;
     }
     if !o.domains.is_empty() && !o.domains.matches_host(ctx.source_host) {

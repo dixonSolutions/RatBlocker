@@ -3,6 +3,7 @@
 //! precedence, parser edge cases and configuration migrations.
 
 use ratblocker_core::parser::{parse_line, ListFormat, ParsedLine, RejectReason};
+use ratblocker_core::rule_engine::dnr;
 use ratblocker_core::rule_engine::rules::{Anchor, PartyConstraint};
 use ratblocker_core::storage::Configuration;
 use ratblocker_core::url;
@@ -215,6 +216,29 @@ fn popup_rules_do_not_block_ordinary_document_navigation() {
 
     // Internal first-party ad paths still match when opened as a popup.
     assert_eq!(e.evaluate(&ordinary.as_popup()).decision, FilterDecision::Block);
+}
+
+#[test]
+fn popup_and_subdocument_options_match_either_request_type() {
+    let rule = "*/earn.php?z=$popup,subdocument";
+    let e = engine(rule);
+    let iframe = RequestContext::new(
+        "https://ads.test/earn.php?z=7",
+        ResourceType::Subdocument,
+    );
+    let popup = RequestContext::new(
+        "https://ads.test/earn.php?z=7",
+        ResourceType::Document,
+    )
+    .as_popup();
+
+    assert_eq!(e.evaluate(&iframe).decision, FilterDecision::Block);
+    assert_eq!(e.evaluate(&popup).decision, FilterDecision::Block);
+
+    let (rules, problems) = dnr::compile_text(rule, 100_000);
+    assert!(problems.is_empty());
+    assert_eq!(rules.len(), 1);
+    assert_eq!(rules[0].condition.resource_types, vec!["sub_frame"]);
 }
 
 #[test]

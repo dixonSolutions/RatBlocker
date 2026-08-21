@@ -503,9 +503,8 @@ fn parse_options(opts: &str, out: &mut RuleOptions) -> Result<bool, RejectReason
                 out.scope.insert(ExceptionScope::DOCUMENT);
             }
             "popup" => {
-                // Popup context is separate so this does not block an
-                // ordinary same-tab visit to the same document.
-                positive_mask |= ResourceType::Document.mask();
+                // Popup is a separate request type that ORs with concrete
+                // resource types rather than narrowing them.
                 out.popup = Some(!negated);
             }
             "domain" | "from" => {
@@ -577,12 +576,12 @@ fn parse_options(opts: &str, out: &mut RuleOptions) -> Result<bool, RejectReason
         }
     }
 
-    out.resource_mask = if positive_mask != 0 {
+    out.resource_mask = if positive_mask != 0 || out.popup == Some(true) {
         positive_mask & !negative_mask
     } else {
         ResourceType::ALL & !negative_mask
     };
-    if out.resource_mask == 0 {
+    if out.resource_mask == 0 && out.popup != Some(true) {
         return Err(RejectReason::InvalidOptionValue("resource types".into()));
     }
 

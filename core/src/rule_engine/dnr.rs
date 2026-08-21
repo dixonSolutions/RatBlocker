@@ -252,7 +252,11 @@ pub fn convert(
     if !rule.options.apps.is_empty() {
         return Err(Unrepresentable::ApplicationScoped);
     }
-    if rule.options.popup.is_some() {
+    // DNR can enforce the concrete resource-type half of `$popup,type`.
+    // Popup-only and negated-popup rules still require runtime context.
+    if rule.options.popup == Some(false)
+        || (rule.options.popup == Some(true) && rule.options.resource_mask == 0)
+    {
         return Err(Unrepresentable::PopupScoped);
     }
 

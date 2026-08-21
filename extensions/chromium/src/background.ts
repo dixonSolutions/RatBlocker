@@ -23,6 +23,12 @@ const ALLOWLIST_PRIORITY = 1000;
 
 let host: ExtensionHost | null = null;
 let staticRulesetIds: string[] = [];
+const pendingPopups = new Map<number, PopupContext>();
+
+interface PopupContext {
+  sourceTabId: number;
+  sourceUrl: Promise<string | null>;
+}
 
 /** Read the ruleset ids the manifest declares, rather than hardcoding them. */
 function manifestRulesetIds(): string[] {
@@ -139,27 +145,43 @@ async function injectCosmetic(tabId: number, frameId: number, url: string): Prom
   }
 }
 
-/** Close a new tab/window when a filter rule matches it specifically as a popup. */
-async function inspectPopup(
-  details: chrome.webNavigation.WebNavigationSourceCallbackDetails,
-): Promise<void> {
-  if (host === null) return;
-  let sourceUrl: string | null = null;
+function isFilterable(url: string): boolean {
+  return url.startsWith('http:') || url.startsWith('https:');
+}
+
+async function popupSourceUrl(tabId: number): Promise<string | null> {
   try {
-    sourceUrl = (await api.tabs.get(details.sourceTabId)).url ?? null;
+    return (await api.tabs.get(tabId)).url ?? null;
   } catch {
     // The opener may have closed before this event was handled.
+    return null;
   }
-  const result = host.evaluatePopup(details.url, sourceUrl);
+}
+
+/** Close a new tab/window when a filter rule matches it specifically as a popup. */
+async function inspectPopup(
+  tabId: number,
+  targetUrl: string,
+  context: PopupContext,
+): Promise<void> {
+  if (host === null) return;
+  const result = host.evaluatePopup(targetUrl, await context.sourceUrl);
   if (result?.decision !== 'block' && result?.decision !== 'redirect') return;
 
   try {
-    await api.tabs.remove(details.tabId);
-    host.stats.recordBlock(details.sourceTabId);
-    updateBadge(details.sourceTabId);
+    await api.tabs.remove(tabId);
+    host.stats.recordBlock(context.sourceTabId);
+    updateBadge(context.sourceTabId);
   } catch {
     // The target may already have been closed by the browser or the user.
   }
+}
+
+function inspectPendingPopup(tabId: number, url: string): void {
+  const context = pendingPopups.get(tabId);
+  if (context === undefined || !isFilterable(url)) return;
+  pendingPopups.delete(tabId);
+  void inspectPopup(tabId, url, context);
 }
 
 /**
@@ -197,13 +219,26 @@ async function main(): Promise<void> {
 
   api.webNavigation.onCommitted.addListener((details) => {
     void injectCosmetic(details.tabId, details.frameId, details.url);
+    if (details.frameId === 0) inspectPendingPopup(details.tabId, details.url);
   });
   api.webNavigation.onCreatedNavigationTarget.addListener((details) => {
-    void inspectPopup(details);
+    const context: PopupContext = {
+      sourceTabId: details.sourceTabId,
+      sourceUrl: popupSourceUrl(details.sourceTabId),
+    };
+    if (isFilterable(details.url)) {
+      void inspectPopup(details.tabId, details.url, context);
+    } else {
+      pendingPopups.set(details.tabId, context);
+    }
   });
 
-  api.tabs.onRemoved.addListener((tabId) => host?.stats.clearTab(tabId));
+  api.tabs.onRemoved.addListener((tabId) => {
+    pendingPopups.delete(tabId);
+    host?.stats.clearTab(tabId);
+  });
   api.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.url !== undefined) inspectPendingPopup(tabId, changeInfo.url);
     if (changeInfo.status === 'loading' && changeInfo.url !== undefined) {
       host?.stats.clearTab(tabId);
       void api.action.setBadgeText({ tabId, text: '' });
