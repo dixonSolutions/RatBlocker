@@ -215,24 +215,44 @@ Two things to know:
   it will not install one. Self-hosted Gecko updates need AMO unlisted signing,
   or a build that does not enforce signing.
 
-### Google Chrome, off-store
+### Chromium and Chrome, off-store, on every platform
 
-This works on Chrome as well as Chromium, but the routes differ by platform.
-On Linux, the external-extension descriptor above installs an off-store CRX and
-Chrome then updates it from the `update_url` baked into the CRX. On Windows and
-macOS, Chrome refuses off-store external installs, and enterprise policy is the
-supported route:
+This works on Chrome as well as Chromium, and on all three desktop platforms —
+but not by the same mechanism, because Chrome does not offer one.
+
+**On Linux**, an external-extension descriptor installs a local CRX directly,
+and the browser then updates it from the `update_url` baked into that CRX.
+Nothing needs hosting for the install itself.
+
+**On Windows and macOS, Chrome refuses to install an external extension that
+is not hosted in the Chrome Web Store.** The descriptor route does not exist
+there. Enterprise policy is the supported path, and it works for off-store
+extensions — but policy tells the browser *where to fetch from* rather than
+handing it a file, so on those platforms **the CRX must be reachable over HTTPS
+at `RATBLOCKER_UPDATE_BASE`**. A purely local install is not possible.
+
+`package.mjs` writes the policy artefact for each platform into `dist/policy/`:
+
+| Platform | Artefact | Applied by |
+| --- | --- | --- |
+| Linux | `linux-policy.json` | copy to `/etc/opt/chrome/policies/managed/` or `/etc/chromium/policies/managed/` |
+| Windows | `windows-chrome.reg`, `windows-chromium.reg` | `reg import` from an elevated prompt |
+| macOS | `macos-com.google.Chrome.plist`, `macos-org.chromium.Chromium.plist` | MDM, or copy to `/Library/Managed Preferences/` |
+
+`install.mjs` detects the platform and prints the right commands. To see what
+another platform would be told, without changing anything:
 
 ```sh
-sudo install -Dm644 dist/chromium-policy.json /etc/opt/chrome/policies/managed/ratblocker.json   # Chrome
-sudo install -Dm644 dist/chromium-policy.json /etc/chromium/policies/managed/ratblocker.json     # Chromium
+node install.mjs --dry-run --platform darwin
+node install.mjs --dry-run --platform win32
 ```
 
-That policy names the extension id and the same `update_url`, so Chrome
-installs it from your host and keeps it current without the Web Store. It is
-also the only route that works on a managed fleet. `dist/<id>.update.json` is
-the descriptor variant for hosting the CRX remotely rather than shipping it to
-each machine.
+On a managed Mac or a domain-joined Windows machine, deploy the plist or the
+registry values through MDM or Group Policy rather than writing them by hand;
+the generated files describe exactly the same settings.
+
+All three name the same extension id and the same `update_url`, so whichever
+route installs it, updates arrive the same way.
 
 ## Licensing
 

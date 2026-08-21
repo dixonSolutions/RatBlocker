@@ -176,23 +176,85 @@ async function packChromium() {
     )}\n`,
   );
 
-  // The same id, expressed as enterprise policy, for a genuinely remote host.
-  await writeFile(
-    join(dist, 'chromium-policy.json'),
-    `${JSON.stringify(
-      {
-        ExtensionSettings: {
-          [id]: {
-            installation_mode: 'normal_installed',
-            update_url: `${UPDATE_BASE}/chromium-update.xml`,
-            toolbar_pin: 'force_pinned',
-          },
-        },
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  // The same id expressed as enterprise policy, per platform.
+  //
+  // This is not merely an alternative to the external-extension descriptor: on
+  // Windows and macOS, Chrome refuses to install an external extension that is
+  // not hosted in the Web Store, so policy is the *only* store-free route
+  // there. Each operating system reads policy from somewhere different and in
+  // a different format, so each gets its own artefact.
+  const updateUrl = `${UPDATE_BASE}/chromium-update.xml`;
+  const settings = {
+    installation_mode: 'normal_installed',
+    update_url: updateUrl,
+    toolbar_pin: 'force_pinned',
+  };
+  const policyDir = join(dist, 'policy');
+  await mkdir(policyDir, { recursive: true });
+
+  // Linux: a JSON file dropped into the managed-policy directory.
+  const policyJson = `${JSON.stringify({ ExtensionSettings: { [id]: settings } }, null, 2)}\n`;
+  await writeFile(join(dist, 'chromium-policy.json'), policyJson);
+  await writeFile(join(policyDir, 'linux-policy.json'), policyJson);
+
+  // Windows: registry values under the policy hive. ExtensionSettings is
+  // expressed as one subkey per extension id, each value a REG_SZ.
+  const regEscape = (value) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  for (const [vendor, hive] of [
+    ['chrome', 'SOFTWARE\\Policies\\Google\\Chrome'],
+    ['chromium', 'SOFTWARE\\Policies\\Chromium'],
+  ]) {
+    const lines = [
+      'Windows Registry Editor Version 5.00',
+      '',
+      '; RatBlocker, installed from a host you control rather than the Web',
+      '; Store. Chrome on Windows refuses off-store external extensions, so',
+      '; policy is the supported route. Import with:  reg import <this file>',
+      '; (an elevated prompt), then restart the browser.',
+      '',
+      `[HKEY_LOCAL_MACHINE\\${hive}\\ExtensionSettings]`,
+      '',
+      `[HKEY_LOCAL_MACHINE\\${hive}\\ExtensionSettings\\${id}]`,
+      `"installation_mode"="${regEscape(settings.installation_mode)}"`,
+      `"update_url"="${regEscape(settings.update_url)}"`,
+      `"toolbar_pin"="${regEscape(settings.toolbar_pin)}"`,
+      '',
+    ];
+    await writeFile(join(policyDir, `windows-${vendor}.reg`), lines.join('\r\n'));
+  }
+
+  // macOS: a managed-preferences property list.
+  const plistEntries = Object.entries(settings)
+    .map(([k, v]) => `        <key>${k}</key>\n        <string>${v}</string>`)
+    .join('\n');
+  for (const [vendor, domain] of [
+    ['chrome', 'com.google.Chrome'],
+    ['chromium', 'org.chromium.Chromium'],
+  ]) {
+    await writeFile(
+      join(policyDir, `macos-${domain}.plist`),
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  RatBlocker for ${vendor} on macOS. Chrome refuses off-store external
+  extensions here, so policy is the supported route. Deploy through MDM, or
+  for a single machine copy to /Library/Managed Preferences/${domain}.plist
+  and restart the browser.
+-->
+<plist version="1.0">
+  <dict>
+    <key>ExtensionSettings</key>
+    <dict>
+      <key>${id}</key>
+      <dict>
+${plistEntries}
+      </dict>
+    </dict>
+  </dict>
+</plist>
+`,
+    );
+  }
 
   // The remote variant: Chromium fetches the CRX named by the update manifest
   // and keeps it current, with nothing installed locally. `external_crx` and
@@ -212,7 +274,9 @@ async function packChromium() {
   console.log(`update manifest        dist/chromium-update.xml`);
   console.log(`local install          dist/${id}.json -> /usr/share/chromium/extensions/`);
   console.log(`remote install         dist/${id}.update.json -> same directory`);
-  console.log(`remote install policy  dist/chromium-policy.json -> /etc/chromium/policies/managed/`);
+  console.log(`policy (linux)         dist/policy/linux-policy.json`);
+  console.log(`policy (windows)       dist/policy/windows-{chrome,chromium}.reg`);
+  console.log(`policy (macos)         dist/policy/macos-*.plist`);
   console.log(`update url             ${UPDATE_BASE}/chromium-update.xml`);
   return id;
 }

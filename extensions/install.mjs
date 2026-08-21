@@ -37,7 +37,7 @@ const HOME = homedir();
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const UNINSTALL = args.includes('--uninstall');
-const only = args.filter((a) => !a.startsWith('--'));
+const only = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--platform');
 
 const GECKO_ID = 'ratblocker@ratblocker.github.io';
 const MARKER = '// added by RatBlocker install.mjs';
@@ -49,45 +49,102 @@ const MARKER = '// added by RatBlocker install.mjs';
  * `tests/browser/gecko-signing.mjs` reports for that build; run it to check a
  * browser that is not listed here rather than assuming.
  */
+/**
+ * `--platform <linux|darwin|win32>` reports what would happen on another
+ * operating system. Only honoured with --dry-run: it skips the check that the
+ * browser is actually present, because on a simulated platform it cannot be.
+ * Useful for seeing the commands a Windows or macOS user will be given, and
+ * for exercising those branches from a machine that is neither.
+ */
+const platformFlag = args.indexOf('--platform');
+const PLATFORM_OVERRIDE =
+  platformFlag >= 0 && DRY ? args[platformFlag + 1] : null;
+const PLATFORM = PLATFORM_OVERRIDE ?? process.platform;
+const SIMULATED = PLATFORM_OVERRIDE !== null && PLATFORM_OVERRIDE !== process.platform;
+const APPDATA = process.env.APPDATA ?? join(HOME, 'AppData/Roaming');
+
+/**
+ * Gecko browsers: where the binary lives and where profiles are kept, per
+ * platform. `enforcesSigning` records what `tests/browser/gecko-signing.mjs`
+ * reports for that build; run it for anything not listed rather than guessing.
+ */
 const GECKO = [
   {
     name: 'firefox',
-    binaries: ['firefox'],
-    roots: [join(HOME, '.mozilla/firefox')],
     enforcesSigning: true,
+    binaries: {
+      linux: ['firefox'],
+      darwin: ['/Applications/Firefox.app/Contents/MacOS/firefox', 'firefox'],
+      win32: [
+        'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+        'C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe',
+      ],
+    },
+    roots: {
+      linux: [join(HOME, '.mozilla/firefox')],
+      darwin: [join(HOME, 'Library/Application Support/Firefox')],
+      win32: [join(APPDATA, 'Mozilla/Firefox')],
+    },
   },
   {
     name: 'zen',
-    binaries: [join(HOME, '.tarball-installations/zen/zen'), 'zen', 'zen-browser'],
-    roots: [join(HOME, '.zen')],
     enforcesSigning: false,
+    binaries: {
+      linux: [join(HOME, '.tarball-installations/zen/zen'), 'zen', 'zen-browser'],
+      darwin: ['/Applications/Zen Browser.app/Contents/MacOS/zen', '/Applications/Zen.app/Contents/MacOS/zen'],
+      win32: [
+        'C:\\Program Files\\Zen Browser\\zen.exe',
+        join(process.env.LOCALAPPDATA ?? join(HOME, 'AppData/Local'), 'Zen Browser/zen.exe'),
+      ],
+    },
+    roots: {
+      linux: [join(HOME, '.zen')],
+      darwin: [join(HOME, 'Library/Application Support/zen')],
+      win32: [join(APPDATA, 'zen')],
+    },
   },
   {
     // A flatpak is a separate installation with its own profile tree. Pairing
     // the native binary with these profiles would install into a browser the
     // user is not launching.
     name: 'zen-flatpak',
-    flatpak: 'app.zen_browser.zen',
-    roots: [join(HOME, '.var/app/app.zen_browser.zen/.zen')],
     enforcesSigning: false,
+    flatpak: 'app.zen_browser.zen',
+    roots: { linux: [join(HOME, '.var/app/app.zen_browser.zen/.zen')], darwin: [], win32: [] },
   },
   {
     name: 'librewolf',
-    binaries: ['librewolf'],
-    roots: [join(HOME, '.librewolf')],
     enforcesSigning: false,
+    binaries: {
+      linux: ['librewolf'],
+      darwin: ['/Applications/LibreWolf.app/Contents/MacOS/librewolf'],
+      win32: ['C:\\Program Files\\LibreWolf\\librewolf.exe'],
+    },
+    roots: {
+      linux: [join(HOME, '.librewolf')],
+      darwin: [join(HOME, 'Library/Application Support/librewolf')],
+      win32: [join(APPDATA, 'librewolf')],
+    },
   },
   {
     name: 'librewolf-flatpak',
-    flatpak: 'io.gitlab.librewolf-community',
-    roots: [join(HOME, '.var/app/io.gitlab.librewolf-community/.librewolf')],
     enforcesSigning: false,
+    flatpak: 'io.gitlab.librewolf-community',
+    roots: { linux: [join(HOME, '.var/app/io.gitlab.librewolf-community/.librewolf')], darwin: [], win32: [] },
   },
   {
     name: 'waterfox',
-    binaries: ['waterfox'],
-    roots: [join(HOME, '.waterfox')],
     enforcesSigning: false,
+    binaries: {
+      linux: ['waterfox'],
+      darwin: ['/Applications/Waterfox.app/Contents/MacOS/waterfox'],
+      win32: ['C:\\Program Files\\Waterfox\\waterfox.exe'],
+    },
+    roots: {
+      linux: [join(HOME, '.waterfox')],
+      darwin: [join(HOME, 'Library/Application Support/Waterfox')],
+      win32: [join(APPDATA, 'Waterfox')],
+    },
   },
 ];
 
@@ -173,9 +230,11 @@ async function setUserPrefs(profileDir, { remove = false } = {}) {
 }
 
 async function installGecko(browser, xpi, signed) {
+  const candidates = browser.binaries?.[PLATFORM] ?? [];
   const binary = browser.flatpak !== undefined
     ? (flatpakInstalled(browser.flatpak) ? `flatpak: ${browser.flatpak}` : null)
-    : (browser.binaries.map(onPath).find(Boolean) ?? null);
+    : (candidates.map(onPath).find(Boolean)
+       ?? (SIMULATED && candidates.length > 0 ? `${candidates[0]} (assumed)` : null));
   if (binary === null) return null;
 
   // Check this before profiles: a build that will reject the XPI should say so
@@ -185,7 +244,7 @@ async function installGecko(browser, xpi, signed) {
       note: 'this build enforces Mozilla signing and would reject an unsigned XPI' };
   }
 
-  const roots = browser.roots.filter((r) => existsSync(r));
+  const roots = (browser.roots?.[PLATFORM] ?? []).filter((r) => existsSync(r));
   if (roots.length === 0) {
     return { browser: browser.name, binary, status: 'no-profile',
       note: 'installed, but has never been run — start it once to create a profile' };
@@ -216,50 +275,118 @@ async function installGecko(browser, xpi, signed) {
 
 /* --------------------------------------------------------------- Chromium */
 
+/**
+ * Chromium-based browsers, and how a store-free install reaches each platform.
+ *
+ * These are not three spellings of one mechanism. On Linux an external-
+ * extension descriptor installs a local CRX directly. On Windows and macOS,
+ * Chrome refuses to install an external extension that is not hosted in the
+ * Chrome Web Store, so the descriptor route does not exist there and
+ * enterprise policy is the supported path — which means the CRX must be
+ * reachable over HTTPS at RATBLOCKER_UPDATE_BASE, because policy tells the
+ * browser where to fetch rather than handing it a file.
+ */
 const CHROMIUM = [
-  { name: 'chromium', binaries: ['chromium', 'chromium-browser'],
-    extensionDir: '/usr/share/chromium/extensions',
-    policyDir: '/etc/chromium/policies/managed' },
-  { name: 'google-chrome', binaries: ['google-chrome', 'google-chrome-stable'],
-    extensionDir: '/opt/google/chrome/extensions',
-    policyDir: '/etc/opt/chrome/policies/managed' },
+  {
+    name: 'chromium',
+    vendor: 'chromium',
+    binaries: {
+      linux: ['chromium', 'chromium-browser'],
+      darwin: ['/Applications/Chromium.app/Contents/MacOS/Chromium'],
+      win32: ['C:\\Program Files\\Chromium\\Application\\chrome.exe'],
+    },
+    linuxExtensionDir: '/usr/share/chromium/extensions',
+    macPlistDomain: 'org.chromium.Chromium',
+  },
+  {
+    name: 'google-chrome',
+    vendor: 'chrome',
+    binaries: {
+      linux: ['google-chrome', 'google-chrome-stable'],
+      darwin: ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'],
+      win32: [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      ],
+    },
+    linuxExtensionDir: '/opt/google/chrome/extensions',
+    macPlistDomain: 'com.google.Chrome',
+  },
 ];
 
 const CRX_INSTALLED = '/usr/share/ratblocker/ratblocker-chromium.crx';
 
 async function planChromium(browser, crx, descriptor, id) {
-  const binary = browser.binaries.map(onPath).find(Boolean);
-  if (binary === null || binary === undefined) return null;
+  const candidates = browser.binaries?.[PLATFORM] ?? [];
+  const binary = candidates.map(onPath).find(Boolean)
+    ?? (SIMULATED && candidates.length > 0 ? `${candidates[0]} (assumed)` : null);
+  if (binary === null) return null;
 
-  const target = join(browser.extensionDir, `${id}.json`);
-  const isRoot = process.getuid?.() === 0;
+  const elevated = PLATFORM === 'win32' ? false : process.getuid?.() === 0;
+  const policyDir = join(dist, 'policy');
 
-  if (UNINSTALL) {
-    const commands = [`rm -f ${target}`];
-    if (browser.name === 'chromium') commands.push(`rm -f ${CRX_INSTALLED}`);
-    if (isRoot && !DRY) {
-      await rm(target, { force: true });
-      if (browser.name === 'chromium') await rm(CRX_INSTALLED, { force: true });
-      return { browser: browser.name, binary, status: 'ok', actions: commands.map((c) => `ran: ${c}`) };
+  if (PLATFORM === 'linux') {
+    const target = join(browser.linuxExtensionDir, `${id}.json`);
+    const commands = UNINSTALL
+      ? [`rm -f ${target}`, `rm -f ${CRX_INSTALLED}`]
+      : [
+          `install -Dm644 ${crx} ${CRX_INSTALLED}`,
+          `install -Dm644 ${descriptor} ${target}`,
+        ];
+    if (elevated && !DRY) {
+      if (UNINSTALL) {
+        await rm(target, { force: true });
+        await rm(CRX_INSTALLED, { force: true });
+      } else {
+        await mkdir(dirname(CRX_INSTALLED), { recursive: true });
+        await copyFile(crx, CRX_INSTALLED);
+        await chmod(CRX_INSTALLED, 0o644);
+        await mkdir(browser.linuxExtensionDir, { recursive: true });
+        await copyFile(descriptor, target);
+        await chmod(target, 0o644);
+      }
+      return { browser: browser.name, binary, status: 'ok',
+        actions: commands.map((c) => `ran: ${c}`), note: 'restart the browser' };
     }
     return { browser: browser.name, binary, status: 'needs-root', commands };
   }
 
-  const commands = [
-    `install -Dm644 ${crx} ${CRX_INSTALLED}`,
-    `install -Dm644 ${descriptor} ${target}`,
-  ];
-  if (isRoot && !DRY) {
-    await mkdir(dirname(CRX_INSTALLED), { recursive: true });
-    await copyFile(crx, CRX_INSTALLED);
-    await chmod(CRX_INSTALLED, 0o644);
-    await mkdir(browser.extensionDir, { recursive: true });
-    await copyFile(descriptor, target);
-    await chmod(target, 0o644);
-    return { browser: browser.name, binary, status: 'ok',
-      actions: commands.map((c) => `ran: ${c}`), note: 'restart the browser to pick it up' };
+  if (PLATFORM === 'darwin') {
+    const source = join(policyDir, `macos-${browser.macPlistDomain}.plist`);
+    const target = `/Library/Managed Preferences/${browser.macPlistDomain}.plist`;
+    const commands = UNINSTALL
+      ? [`rm -f "${target}"`]
+      : [`install -m 644 "${source}" "${target}"`];
+    return {
+      browser: browser.name, binary,
+      status: elevated && !DRY ? 'manual' : 'needs-root',
+      commands,
+      note:
+        'Chrome refuses off-store external installs on macOS, so this goes through ' +
+        'policy; the CRX must be served over HTTPS at RATBLOCKER_UPDATE_BASE. ' +
+        'On a managed Mac, deploy the plist through MDM instead of writing it by hand.',
+    };
   }
-  return { browser: browser.name, binary, status: 'needs-root', commands };
+
+  if (PLATFORM === 'win32') {
+    const source = join(policyDir, `windows-${browser.vendor}.reg`);
+    const hive = browser.vendor === 'chrome'
+      ? 'HKLM\\SOFTWARE\\Policies\\Google\\Chrome\\ExtensionSettings'
+      : 'HKLM\\SOFTWARE\\Policies\\Chromium\\ExtensionSettings';
+    const commands = UNINSTALL
+      ? [`reg delete "${hive}\\${id}" /f`]
+      : [`reg import "${source}"`];
+    return {
+      browser: browser.name, binary, status: 'needs-admin', commands,
+      note:
+        'Chrome refuses off-store external installs on Windows, so this goes through ' +
+        'policy; run from an elevated prompt. The CRX must be served over HTTPS at ' +
+        'RATBLOCKER_UPDATE_BASE.',
+    };
+  }
+
+  return { browser: browser.name, binary, status: 'unsupported',
+    note: `no store-free install route is implemented for ${PLATFORM}` };
 }
 
 /* ------------------------------------------------------------------- main */
@@ -309,11 +436,13 @@ if (found.length === 0) {
 
 const rootCommands = [];
 for (const r of found) {
-  const mark = { ok: '✓', refused: '✗', 'needs-root': '!', 'no-profile': '-' }[r.status] ?? '?';
+  const mark = { ok: '✓', refused: '✗', 'needs-root': '!', 'needs-admin': '!',
+                 manual: '!', 'no-profile': '-', unsupported: '✗' }[r.status] ?? '?';
   console.log(`${mark} ${r.browser.padEnd(15)} ${r.binary}`);
   for (const action of r.actions ?? []) console.log(`    ${action}`);
-  if (r.status === 'needs-root') {
-    console.log('    needs root; commands collected below');
+  if (r.status === 'needs-root' || r.status === 'needs-admin' || r.status === 'manual') {
+    console.log(`    ${r.status === 'needs-admin' ? 'needs an elevated prompt' : 'needs root'};`
+      + ' commands collected below');
     rootCommands.push(...r.commands);
   }
   if (r.note) console.log(`    ${r.note}`);
@@ -328,7 +457,11 @@ if (found.some((r) => r.status === 'refused')) {
 }
 
 if (rootCommands.length > 0) {
-  console.log('\nChromium-based browsers have no per-user external-extension directory,');
-  console.log('so these need root:\n');
-  console.log(`  sudo sh -c '${rootCommands.join(' && ')}'`);
+  console.log('\nChromium-based browsers need elevated privileges for a store-free');
+  console.log('install, because the location involved is system-wide:\n');
+  const prefix = PLATFORM === 'win32' ? '' : 'sudo ';
+  for (const command of rootCommands) console.log(`  ${prefix}${command}`);
+  if (PLATFORM === 'win32') {
+    console.log('\nRun these from an elevated Command Prompt or PowerShell.');
+  }
 }
