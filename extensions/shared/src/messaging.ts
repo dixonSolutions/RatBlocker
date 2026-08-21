@@ -31,6 +31,7 @@ export type Message =
   | { type: 'getCosmetic'; url: string }
   | { type: 'shouldFilter'; url: string }
   | { type: 'resetStatistics' }
+  | { type: 'checkForUpdates' }
   | { type: 'getDiagnostics' };
 
 export type Response =
@@ -38,6 +39,7 @@ export type Response =
   | { ok: true; settings: Settings }
   | { ok: true; css: string; count: number }
   | { ok: true; filtering: boolean }
+  | { ok: true; update: { status: string; version?: string } | null }
   | { ok: true; diagnostics: Record<string, unknown> }
   | { ok: true }
   | { ok: false; error: string };

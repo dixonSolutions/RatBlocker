@@ -115,6 +115,16 @@ async function packChromium() {
   if (!existsSync(build)) throw new Error(`build first: ${build} does not exist`);
 
   await mkdir(dist, { recursive: true });
+
+  // The CRX must carry the address it will be updated from. Without an
+  // update_url Chromium assumes the Web Store, and an extension that is not
+  // there simply never updates. This is injected at packaging time rather than
+  // kept in the source manifest because it is a distribution concern: a
+  // development build loaded unpacked has no business polling anything.
+  const manifestPath = join(build, 'manifest.json');
+  const buildManifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  buildManifest.update_url = `${UPDATE_BASE}/chromium-update.xml`;
+  await writeFile(manifestPath, `${JSON.stringify(buildManifest, null, 2)}\n`);
   const key = join(repo, 'chromium-signing-key.pem');
   const isNewKey = !existsSync(key);
 
@@ -184,11 +194,26 @@ async function packChromium() {
     )}\n`,
   );
 
+  // The remote variant: Chromium fetches the CRX named by the update manifest
+  // and keeps it current, with nothing installed locally. `external_crx` and
+  // `external_update_url` are alternatives, so they ship as separate files
+  // rather than one ambiguous descriptor.
+  await writeFile(
+    join(dist, `${id}.update.json`),
+    `${JSON.stringify(
+      { external_update_url: `${UPDATE_BASE}/chromium-update.xml` },
+      null,
+      2,
+    )}\n`,
+  );
+
   console.log(`\nchromium extension id  ${id}`);
   console.log(`crx                    ${relative(repo, crx)} (${(size / 1024 / 1024).toFixed(1)} MiB)`);
   console.log(`update manifest        dist/chromium-update.xml`);
   console.log(`local install          dist/${id}.json -> /usr/share/chromium/extensions/`);
+  console.log(`remote install         dist/${id}.update.json -> same directory`);
   console.log(`remote install policy  dist/chromium-policy.json -> /etc/chromium/policies/managed/`);
+  console.log(`update url             ${UPDATE_BASE}/chromium-update.xml`);
   return id;
 }
 
@@ -198,7 +223,15 @@ async function packFirefox() {
   if (!existsSync(build)) throw new Error(`build first: ${build} does not exist`);
   await mkdir(dist, { recursive: true });
 
-  const manifest = JSON.parse(await readFile(join(build, 'manifest.json'), 'utf8'));
+  const manifestPath = join(build, 'manifest.json');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+
+  // Same reasoning as Chromium: where to check for updates is a property of
+  // the distribution, not of the source tree.
+  const updateManifestUrl = `${UPDATE_BASE}/firefox-updates.json`;
+  manifest.browser_specific_settings.gecko.update_url = updateManifestUrl;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
   const xpi = join(dist, `ratblocker-firefox-${manifest.version}.xpi`);
 
   // Deterministic ordering keeps the archive reproducible.
@@ -216,8 +249,33 @@ async function packFirefox() {
 
   execFileSync('zip', ['-q', '-X', '-9', xpi, ...entries], { cwd: build });
   const size = (await stat(xpi)).size;
+
+  // The manifest Gecko polls. `update_link` must be https: Firefox refuses to
+  // fetch an update over plain http regardless of the signature on the file.
+  const id = manifest.browser_specific_settings.gecko.id;
+  await writeFile(
+    join(dist, 'firefox-updates.json'),
+    `${JSON.stringify(
+      {
+        addons: {
+          [id]: {
+            updates: [
+              {
+                version: manifest.version,
+                update_link: `${UPDATE_BASE}/ratblocker-firefox-${manifest.version}.xpi`,
+              },
+            ],
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
   console.log(`\nfirefox xpi            ${relative(repo, xpi)} (${(size / 1024 / 1024).toFixed(1)} MiB)`);
-  console.log(`extension id           ${manifest.browser_specific_settings.gecko.id}`);
+  console.log(`extension id           ${id}`);
+  console.log(`update manifest        dist/firefox-updates.json`);
+  console.log(`update url             ${updateManifestUrl}`);
   console.log('This XPI is unsigned. Release Firefox will only install it');
   console.log('temporarily; run sign-firefox.mjs to have Mozilla sign it for');
   console.log('self-hosted (unlisted) distribution.');

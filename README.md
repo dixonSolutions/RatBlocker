@@ -115,10 +115,17 @@ Either directory can be loaded as an unpacked extension for development.
 Build and package first, then install:
 
 ```sh
-cd extensions && node build.mjs && node package.mjs
+cd extensions && node build.mjs
+RATBLOCKER_UPDATE_BASE=https://your.host/ratblocker node package.mjs
 node install.mjs --dry-run     # what it would do, changing nothing
 node install.mjs               # do it
 ```
+
+`RATBLOCKER_UPDATE_BASE` is where the packaged extensions will look for
+updates. It is baked into the artifacts at packaging time, so set it before
+packaging anything you intend to distribute; see *Staying up to date* below.
+Left unset it falls back to a placeholder host, which is fine for local use and
+useless for distribution.
 
 `install.mjs` finds the supported browsers on the machine and uses the right
 mechanism for each. `--uninstall` reverses it; naming browsers
@@ -137,9 +144,20 @@ surprises you.
 **Chromium-based browsers have no per-user external-extension directory on
 Linux.** A store-free install that survives restarts has to write to a system
 path, so it needs root. The script performs the work when run as root and
-otherwise prints the exact commands. Chromium and Chrome take the same CRX and
-the same descriptor; only the directory differs
-(`/usr/share/chromium/extensions` versus `/opt/google/chrome/extensions`).
+otherwise prints the exact commands, which look like this:
+
+```sh
+# Chromium
+sudo sh -c 'install -Dm644 dist/ratblocker-chromium.crx /usr/share/ratblocker/ratblocker-chromium.crx \
+  && install -Dm644 dist/<extension-id>.json /usr/share/chromium/extensions/<extension-id>.json'
+
+# Google Chrome — same two files, different directory
+sudo sh -c 'install -Dm644 dist/ratblocker-chromium.crx /usr/share/ratblocker/ratblocker-chromium.crx \
+  && install -Dm644 dist/<extension-id>.json /opt/google/chrome/extensions/<extension-id>.json'
+```
+
+`<extension-id>` is printed by `package.mjs` and is derived from
+`chromium-signing-key.pem`. Restart the browser afterwards.
 
 **Gecko browsers install per profile and need no privileges**, but whether they
 accept an *unsigned* XPI depends on how the binary was compiled.
@@ -167,10 +185,54 @@ For release Firefox there are two routes:
   `install.mjs` installs it like any other.
 - Use a build that does not enforce signing, from the list above.
 
-For genuinely remote hosting, publish `ratblocker-chromium.crx` and
-`chromium-update.xml` and deploy `dist/chromium-policy.json` to
-`/etc/chromium/policies/managed/` (Chromium) or
-`/etc/opt/chrome/policies/managed/` (Google Chrome).
+## Staying up to date
+
+An extension installed outside a store still updates through the browser's own
+machinery, as long as the packaged manifest says where to look. `package.mjs`
+writes that address into both builds and generates the manifests they poll:
+
+| File | Polled by | Points at |
+| --- | --- | --- |
+| `dist/chromium-update.xml` | Chromium, Chrome | `ratblocker-chromium.crx` |
+| `dist/firefox-updates.json` | Firefox and forks | the versioned `.xpi` |
+
+Serve `dist/` over HTTPS at whatever you set `RATBLOCKER_UPDATE_BASE` to, and
+publish a new build by dropping the new CRX or XPI beside an updated manifest.
+The browser verifies the signature and installs it; RatBlocker never downloads
+or applies an update itself.
+
+Both engines poll on their own schedule — Chromium roughly every five hours,
+Gecko about once a day — so a browser that is opened and closed inside that
+window can go a long time without checking. The extension therefore asks for a
+check at startup as well, through `runtime.requestUpdateCheck`, rate-limited to
+once every six hours. There is also a manual `checkForUpdates` message.
+
+Two things to know:
+
+- **`update_link` must be HTTPS.** Firefox refuses to fetch an update over
+  plain HTTP no matter how the file is signed.
+- **Release Firefox will not update to an unsigned XPI**, for the same reason
+  it will not install one. Self-hosted Gecko updates need AMO unlisted signing,
+  or a build that does not enforce signing.
+
+### Google Chrome, off-store
+
+This works on Chrome as well as Chromium, but the routes differ by platform.
+On Linux, the external-extension descriptor above installs an off-store CRX and
+Chrome then updates it from the `update_url` baked into the CRX. On Windows and
+macOS, Chrome refuses off-store external installs, and enterprise policy is the
+supported route:
+
+```sh
+sudo install -Dm644 dist/chromium-policy.json /etc/opt/chrome/policies/managed/ratblocker.json   # Chrome
+sudo install -Dm644 dist/chromium-policy.json /etc/chromium/policies/managed/ratblocker.json     # Chromium
+```
+
+That policy names the extension id and the same `update_url`, so Chrome
+installs it from your host and keeps it current without the Web Store. It is
+also the only route that works on a managed fleet. `dist/<id>.update.json` is
+the descriptor variant for hosting the CRX remotely rather than shipping it to
+each machine.
 
 ## Licensing
 

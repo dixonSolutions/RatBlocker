@@ -19,6 +19,7 @@ import {
   type Settings,
 } from './settings.js';
 import { Statistics } from './statistics.js';
+import { checkForUpdates } from './updates.js';
 import type { FilterResult } from './types.js';
 import { RatBlockerEngine } from './wasm.js';
 
@@ -282,6 +283,10 @@ export class ExtensionHost {
         case 'resetStatistics':
           this.stats.reset();
           return { ok: true };
+
+        /** Force a poll now, bypassing the interval guard. */
+        case 'checkForUpdates':
+          return { ok: true, update: await checkForUpdates({ force: true }) };
 
         case 'getDiagnostics':
           return { ok: true, diagnostics: this.diagnostics() };
