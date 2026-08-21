@@ -37,6 +37,17 @@ const HOME = homedir();
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const UNINSTALL = args.includes('--uninstall');
+/**
+ * Update mode: install only where what is already there is older.
+ *
+ * This is the whole of RatBlocker's "update engine" for every target that does
+ * not require a server. Neither browser needs to be told: Gecko reads the
+ * version out of <profile>/extensions/<id>.xpi at startup, and Chromium
+ * rescans its external-extension descriptors at every start and upgrades when
+ * external_version is higher. Replacing the file *is* the update. The browser
+ * still performs the install itself, and still verifies it.
+ */
+const UPDATE = args.includes('--update');
 const only = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--platform');
 
 const GECKO_ID = 'ratblocker@ratblocker.github.io';
@@ -198,6 +209,31 @@ async function profilesIn(root) {
     .filter((p) => existsSync(p.dir));
 }
 
+/**
+ * What version is installed in this profile, according to the browser's own
+ * database? Returns null when nothing is installed or the profile has not been
+ * opened yet, which update mode treats as "install it".
+ */
+async function installedGeckoVersion(profileDir) {
+  try {
+    const db = JSON.parse(await readFile(join(profileDir, 'extensions.json'), 'utf8'));
+    return (db.addons ?? []).find((a) => a.id === GECKO_ID)?.version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Compare dotted version strings. Positive when `a` is newer than `b`. */
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map((n) => Number.parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 /** True when the XPI carries a Mozilla signature. */
 async function xpiIsSigned(xpi) {
   const buf = await readFile(xpi);
@@ -229,7 +265,7 @@ async function setUserPrefs(profileDir, { remove = false } = {}) {
   await writeFile(path, body.trimStart());
 }
 
-async function installGecko(browser, xpi, signed) {
+async function installGecko(browser, xpi, signed, packagedVersion) {
   const candidates = browser.binaries?.[PLATFORM] ?? [];
   const binary = browser.flatpak !== undefined
     ? (flatpakInstalled(browser.flatpak) ? `flatpak: ${browser.flatpak}` : null)
@@ -254,6 +290,22 @@ async function installGecko(browser, xpi, signed) {
   for (const root of roots) {
     for (const profile of await profilesIn(root)) {
       const target = join(profile.dir, 'extensions', `${GECKO_ID}.xpi`);
+
+      if (UPDATE && !UNINSTALL) {
+        const current = await installedGeckoVersion(profile.dir);
+        if (current !== null && compareVersions(packagedVersion, current) <= 0) {
+          touched.push(`up to date (${current}) in ${profile.dir}`);
+          continue;
+        }
+        touched.push(`${current ?? 'nothing'} -> ${packagedVersion} in ${profile.dir}`);
+        if (DRY) continue;
+        await mkdir(dirname(target), { recursive: true });
+        await copyFile(xpi, target);
+        await chmod(target, 0o644);
+        if (!signed) await setUserPrefs(profile.dir);
+        continue;
+      }
+
       if (DRY) { touched.push(`${UNINSTALL ? 'would remove' : 'would install'} ${target}`); continue; }
       if (UNINSTALL) {
         await rm(target, { force: true });
@@ -405,6 +457,15 @@ if (xpi === undefined && !existsSync(crx)) {
 const xpiPath = xpi === undefined ? null : join(dist, xpi);
 const signed = xpiPath === null ? false : await xpiIsSigned(xpiPath);
 
+// The version actually inside the packaged XPI, which is what would be
+// installed. Read from the file rather than from package.json so the two can
+// never disagree.
+let packagedVersion = '0.0.0';
+if (xpiPath !== null) {
+  const match = /ratblocker-firefox-(.+)\.xpi$/.exec(xpi);
+  if (match !== null) packagedVersion = match[1];
+}
+
 let descriptor = null;
 let id = null;
 if (existsSync(crx)) {
@@ -416,7 +477,7 @@ const results = [];
 for (const browser of GECKO) {
   if (only.length > 0 && !only.includes(browser.name)) continue;
   if (xpiPath === null) continue;
-  results.push(await installGecko(browser, xpiPath, signed));
+  results.push(await installGecko(browser, xpiPath, signed, packagedVersion));
 }
 for (const browser of CHROMIUM) {
   if (only.length > 0 && !only.includes(browser.name)) continue;
@@ -425,7 +486,8 @@ for (const browser of CHROMIUM) {
 }
 
 const found = results.filter(Boolean);
-console.log(`\nRatBlocker ${UNINSTALL ? 'uninstall' : 'install'}${DRY ? ' (dry run)' : ''}`);
+const mode = UNINSTALL ? 'uninstall' : UPDATE ? 'update' : 'install';
+console.log(`\nRatBlocker ${mode}${DRY ? ' (dry run)' : ''}`);
 console.log(`gecko XPI: ${xpiPath === null ? 'not packaged' : `${xpi} (${signed ? 'signed' : 'UNSIGNED'})`}`);
 console.log(`chromium CRX: ${descriptor === null ? 'not packaged' : `${id}`}\n`);
 

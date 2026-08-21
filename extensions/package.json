@@ -12,7 +12,8 @@
     "build:firefox": "node build.mjs firefox",
     "test": "node --test \"tests/*.test.mjs\"",
     "install:local": "node install.mjs",
-    "uninstall:local": "node install.mjs --uninstall"
+    "uninstall:local": "node install.mjs --uninstall",
+    "update:local": "node install.mjs --update"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

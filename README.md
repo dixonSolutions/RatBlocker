@@ -131,6 +131,14 @@ useless for distribution.
 mechanism for each. `--uninstall` reverses it; naming browsers
 (`node install.mjs zen chromium`) restricts it.
 
+`--update` installs only where what is present is older, and never downgrades.
+That is the whole update mechanism for every target that does not need a
+server: Gecko reads the version out of the profile at startup and Chromium
+rescans its external descriptors at every start, so replacing the file *is* the
+update. Run it from a login item or a timer and installs stay current with no
+hosting at all. See *How updates actually reach an install* in
+[`docs/scope.md`](docs/scope.md) for which targets that covers.
+
 | Browser | Mechanism | Root | Unsigned XPI |
 | --- | --- | --- | --- |
 | Chromium | CRX + external-extension descriptor | yes | n/a |
