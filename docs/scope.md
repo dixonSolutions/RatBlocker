@@ -15,6 +15,19 @@ oversight.
 Firefox for Android is declared in the manifest (`gecko_android`) but has not
 been tested on a device. Treat it as unverified until it has been.
 
+### Installing without a store
+
+`extensions/install.mjs` handles all of them; see the README. Two constraints
+shape it, both verified on this project's own artifacts rather than assumed:
+
+- Release Firefox refuses an unsigned XPI outright
+  (`ERROR_SIGNEDSTATE_REQUIRED`), so the installer refuses too rather than
+  leaving a disabled add-on in the profile. Zen accepts one permanently.
+  `tests/browser/gecko-signing.mjs` answers this for any build.
+- Chromium-based browsers have no per-user external-extension directory on
+  Linux, so a persistent store-free install requires root. That is a property
+  of the browsers, not a choice this project made.
+
 ## Removed: the Linux system daemon
 
 A DNS proxy, D-Bus service, Polkit policy and CLI once shipped under `linux/`.

@@ -112,47 +112,65 @@ Either directory can be loaded as an unpacked extension for development.
 
 ### Browsers, without a store
 
-```sh
-cd extensions && node package.mjs
-```
-
-For **Chromium**, this produces a signed CRX, an update manifest and the Linux
-external-extension descriptor. The extension id is derived from
-`chromium-signing-key.pem`, which is generated on first run and is gitignored —
-keep it, because losing it changes the id and orphans every existing install.
-Installing without the Web Store:
+Build and package first, then install:
 
 ```sh
-sudo install -Dm644 dist/ratblocker-chromium.crx /usr/share/ratblocker/ratblocker-chromium.crx
-
-# Chromium
-sudo install -Dm644 dist/<extension-id>.json /usr/share/chromium/extensions/
-
-# Google Chrome reads the same descriptor from its own directory
-sudo install -Dm644 dist/<extension-id>.json /opt/google/chrome/extensions/
+cd extensions && node build.mjs && node package.mjs
+node install.mjs --dry-run     # what it would do, changing nothing
+node install.mjs               # do it
 ```
 
-The same CRX and descriptor serve both browsers; only the directory differs.
+`install.mjs` finds the supported browsers on the machine and uses the right
+mechanism for each. `--uninstall` reverses it; naming browsers
+(`node install.mjs zen chromium`) restricts it.
+
+| Browser | Mechanism | Root | Unsigned XPI |
+| --- | --- | --- | --- |
+| Chromium | CRX + external-extension descriptor | yes | n/a |
+| Google Chrome | CRX + external-extension descriptor | yes | n/a |
+| Zen, LibreWolf, Waterfox | XPI into each profile | no | accepted |
+| Firefox (release) | XPI into each profile | no | **refused** |
+
+The two families differ in ways that are worth knowing before something
+surprises you.
+
+**Chromium-based browsers have no per-user external-extension directory on
+Linux.** A store-free install that survives restarts has to write to a system
+path, so it needs root. The script performs the work when run as root and
+otherwise prints the exact commands. Chromium and Chrome take the same CRX and
+the same descriptor; only the directory differs
+(`/usr/share/chromium/extensions` versus `/opt/google/chrome/extensions`).
+
+**Gecko browsers install per profile and need no privileges**, but whether they
+accept an *unsigned* XPI depends on how the binary was compiled.
+`xpinstall.signatures.required` is only honoured where `MOZ_REQUIRE_SIGNING`
+was off. Release Firefox enforces it and rejects the XPI outright, so
+`install.mjs` refuses rather than leaving a silently disabled add-on behind.
+Zen, LibreWolf, Waterfox, Developer Edition, Nightly, ESR and Mozilla's
+unbranded builds accept it.
+
+Flatpak installs are treated as separate browsers, because they are: a flatpak
+keeps its profiles under `~/.var/app/`, and installing there would not affect a
+native install of the same browser.
+
+To check a build this table does not cover, ask it directly:
+
+```sh
+node tests/browser/gecko-signing.mjs <browser-binary> dist/ratblocker-firefox-0.1.0.xpi
+```
+
+For release Firefox there are two routes:
+
+- `node sign-firefox.mjs` submits the XPI to addons.mozilla.org for *unlisted*
+  signing — no review queue, nothing listed publicly, and you host the signed
+  file and its updates yourself. It needs an AMO API key. Once signed,
+  `install.mjs` installs it like any other.
+- Use a build that does not enforce signing, from the list above.
 
 For genuinely remote hosting, publish `ratblocker-chromium.crx` and
 `chromium-update.xml` and deploy `dist/chromium-policy.json` to
 `/etc/chromium/policies/managed/` (Chromium) or
 `/etc/opt/chrome/policies/managed/` (Google Chrome).
-
-For **Firefox**, this produces an XPI. Release Firefox refuses to permanently
-install an unsigned extension and no preference or policy overrides that, so
-there are two routes:
-
-- `node sign-firefox.mjs` submits the XPI to addons.mozilla.org for *unlisted*
-  signing — no review queue, nothing listed publicly, and you host the signed
-  file and its updates yourself. It needs an AMO API key.
-- Gecko forks built without `MOZ_REQUIRE_SIGNING` — Zen, LibreWolf, Waterfox,
-  Mullvad Browser — and Mozilla's own Developer Edition, Nightly, ESR and
-  unbranded builds install the unsigned XPI directly once
-  `xpinstall.signatures.required` is `false`.
-
-`node tests/browser/gecko-signing.mjs <browser-binary> <xpi>` answers which
-category a given build falls into, by trying a permanent unsigned install.
 
 ## Licensing
 
