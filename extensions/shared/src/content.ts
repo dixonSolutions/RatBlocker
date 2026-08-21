@@ -34,7 +34,33 @@ function inject(css: string): void {
   (document.head ?? document.documentElement).append(style);
 }
 
+/**
+ * Activate the MAIN-world streaming pruner, which starts inert.
+ *
+ * It cannot read settings from the page world, so the decision is made here
+ * and sent across. Only activation is ever sent: staying silent leaves
+ * pruning off, so a disabled extension, an active pause or an allowlisted
+ * domain all result in no message and no pruning.
+ */
+async function activateStreamingPruner(): Promise<void> {
+  if (!/(^|\.)(youtube|youtube-nocookie)\.com$/.test(location.hostname)) return;
+  try {
+    const response = (await api.runtime.sendMessage({
+      type: 'shouldFilter',
+      url: location.href,
+    })) as { ok: boolean; filtering?: boolean } | undefined;
+    if (response?.ok !== true || response.filtering !== true) return;
+  } catch {
+    // Background asleep or restarting: leave the pruner inert rather than
+    // guessing that filtering applies.
+    return;
+  }
+  window.postMessage({ source: 'ratblocker-streaming', enable: true }, location.origin);
+}
+
 async function main(): Promise<void> {
+  void activateStreamingPruner();
+
   // The background already injected for ordinary frames; only step in when it
   // demonstrably has not.
   const alreadyStyled = document.adoptedStyleSheets.length > 0;

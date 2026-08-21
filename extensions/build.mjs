@@ -28,6 +28,7 @@ const TARGETS = {
     entries: {
       background: 'chromium/src/background.ts',
       content: 'shared/src/content.ts',
+      'streaming-ads': 'shared/src/streaming-ads.ts',
     },
     // Chromium filters declaratively, so it only needs the cosmetic database.
     database: [join(dist, 'chromium/cosmetic.rbdb'), 'rules/cosmetic.rbdb'],
@@ -48,6 +49,7 @@ const TARGETS = {
     entries: {
       background: 'firefox/src/background.ts',
       content: 'shared/src/content.ts',
+      'streaming-ads': 'shared/src/streaming-ads.ts',
     },
     // Firefox runs the full core, so it ships the full database.
     database: [join(dist, 'rules.rbdb'), 'rules/rules.rbdb'],

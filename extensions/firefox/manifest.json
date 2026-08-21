@@ -8,6 +8,9 @@
       "id": "ratblocker@ratblocker.github.io",
       "strict_min_version": "128.0",
       "update_url": "https://ratblocker.example/downloads/firefox-updates.json"
+    },
+    "gecko_android": {
+      "strict_min_version": "128.0"
     }
   },
   "icons": {
@@ -43,6 +46,18 @@
     "open_in_tab": true
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.youtube-nocookie.com/*"
+      ],
+      "js": [
+        "streaming-ads.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
     {
       "matches": [
         "http://*/*",
