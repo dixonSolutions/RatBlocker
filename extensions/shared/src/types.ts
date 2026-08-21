@@ -22,6 +22,7 @@ export interface RequestContext {
   source_url: string | null;
   application_id: string | null;
   resource_type: ResourceType;
+  is_popup: boolean;
 }
 
 export interface FilterResult {

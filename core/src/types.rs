@@ -124,6 +124,9 @@ pub struct RequestContext {
     pub source_url: Option<String>,
     pub application_id: Option<String>,
     pub resource_type: ResourceType,
+    /// True when the navigation created a new browser window or tab.
+    #[serde(default)]
+    pub is_popup: bool,
 }
 
 impl RequestContext {
@@ -133,6 +136,7 @@ impl RequestContext {
             source_url: None,
             application_id: None,
             resource_type,
+            is_popup: false,
         }
     }
 
@@ -143,6 +147,11 @@ impl RequestContext {
 
     pub fn with_application(mut self, application_id: impl Into<String>) -> Self {
         self.application_id = Some(application_id.into());
+        self
+    }
+
+    pub fn as_popup(mut self) -> Self {
+        self.is_popup = true;
         self
     }
 }

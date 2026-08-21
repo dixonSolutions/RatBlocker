@@ -222,21 +222,22 @@ fn build(specs: &[String], out: &Path, report_rejects: bool) -> Result<()> {
     write_atomic(&out.join("rules.rbdb"), &encoded)?;
     let db_checksum = format!("{:x}", Sha256::digest(&encoded));
 
-    // 2. Chromium: declarativeNetRequest handles the network side, so the
-    //    extension only needs a cosmetic-rule database — a fraction of the
-    //    size, which matters because an MV3 service worker rebuilds its
-    //    indexes every time it is woken.
+    // 2. Chromium: DNR handles ordinary requests; the core handles cosmetics
+    //    and popup-context rules. Keep this database small because an MV3
+    //    service worker rebuilds its indexes whenever it is woken.
     let dnr = emit_chromium(&db, &out.join("chromium"))?;
     let cosmetic_db = RuleDatabase {
         format_version: db.format_version,
         sources: db.sources.clone(),
-        network: Vec::new(),
-        // Exceptions carrying `$document`/`$elemhide` scopes still govern
-        // whether cosmetic rules apply, so they must come along.
+        network: db.network.iter()
+            .filter(|r| r.options.popup.is_some())
+            .cloned()
+            .collect(),
+        // Popup blocks need normal exception precedence; scoped exceptions
+        // also govern cosmetic filtering.
         exceptions: db
             .exceptions
             .iter()
-            .filter(|r| !r.options.scope.is_empty())
             .cloned()
             .collect(),
         removeparam: Vec::new(),
@@ -274,6 +275,7 @@ fn build(specs: &[String], out: &Path, report_rejects: bool) -> Result<()> {
             "bytes": cosmetic_encoded.len(),
             "cosmetic_rules": cosmetic_db.cosmetic.len(),
             "scope_exceptions": cosmetic_db.exceptions.len(),
+            "popup_rules": cosmetic_db.network.len(),
         },
         "sources": db.sources,
         "redirect_resources": redirect_files,

@@ -32,6 +32,12 @@ install blocks from the first request without contacting anything.
   database, a minimal privileged helper for pointing `systemd-resolved` at the
   proxy, and `ratblocker`, an unprivileged command-line client. Mutating D-Bus
   calls are authorised through Polkit.
+- **Popup and internal-link filtering** — browser-created tabs and windows are
+  evaluated with their opener and full destination URL, so `$popup` rules can
+  match first-party ad paths without blocking ordinary same-tab navigation.
+  Native applications remain DNS-filtered; their UI is outside the safe
+  visibility of a hostname-only proxy. See
+  [`docs/app-filtering.md`](docs/app-filtering.md).
 - **`filter-lists/bundled/`** — the EasyList and EasyPrivacy snapshots that the
   compiler consumes.
 - **`tests/`** — security and performance suites, plus Chromium (CDP) and
@@ -50,8 +56,8 @@ released. The engine, the compiler, the Linux daemon and both browser
 extensions are implemented and covered by tests, but the project has rough
 edges you should know about before relying on it:
 
-- `docs/` and `security/` are empty, even though source comments cite
-  `docs/architecture.md` and its section numbers throughout.
+- The comprehensive `docs/architecture.md` cited by source comments has not
+  been reconstructed yet; focused platform behavior is documented in `docs/`.
 - Android and GNOME frontends are described in the architecture but no such
   code exists in this repository yet.
 - The GTK settings application does not exist yet; the daemon is driven by the

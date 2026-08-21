@@ -203,6 +203,31 @@ fn app_option_scopes_a_rule_to_applications() {
     assert_eq!(e.evaluate(&ctx).decision, FilterDecision::Allow);
 }
 
+#[test]
+fn popup_rules_do_not_block_ordinary_document_navigation() {
+    let e = engine("*/sponsored/out^$popup");
+    let ordinary = RequestContext::new(
+        "https://news.test/sponsored/out?id=7",
+        ResourceType::Document,
+    )
+    .with_source("https://news.test/article");
+    assert_eq!(e.evaluate(&ordinary).decision, FilterDecision::Allow);
+
+    // Internal first-party ad paths still match when opened as a popup.
+    assert_eq!(e.evaluate(&ordinary.as_popup()).decision, FilterDecision::Block);
+}
+
+#[test]
+fn negated_popup_rules_only_match_non_popup_navigation() {
+    let e = engine("||interstitial.test^$document,~popup");
+    let ordinary = RequestContext::new(
+        "https://interstitial.test/landing",
+        ResourceType::Document,
+    );
+    assert_eq!(e.evaluate(&ordinary).decision, FilterDecision::Block);
+    assert_eq!(e.evaluate(&ordinary.as_popup()).decision, FilterDecision::Allow);
+}
+
 // ---------------------------------------------------------------------------
 // Exceptions, importance and allowlist precedence
 // ---------------------------------------------------------------------------

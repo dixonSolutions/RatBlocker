@@ -503,8 +503,10 @@ fn parse_options(opts: &str, out: &mut RuleOptions) -> Result<bool, RejectReason
                 out.scope.insert(ExceptionScope::DOCUMENT);
             }
             "popup" => {
-                // Popups are a navigation, i.e. a document request.
+                // Popup context is separate so this does not block an
+                // ordinary same-tab visit to the same document.
                 positive_mask |= ResourceType::Document.mask();
+                out.popup = Some(!negated);
             }
             "domain" | "from" => {
                 let v = value.ok_or_else(|| RejectReason::InvalidOptionValue(name.clone()))?;

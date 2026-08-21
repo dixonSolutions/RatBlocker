@@ -10,7 +10,7 @@ use super::rules::{CosmeticRule, NetworkRule};
 use super::LoadStats;
 
 /// Bumped whenever the serialized shape changes incompatibly.
-pub const DATABASE_FORMAT_VERSION: u32 = 1;
+pub const DATABASE_FORMAT_VERSION: u32 = 2;
 
 /// Provenance and licensing for one compiled source list.
 ///
