@@ -235,11 +235,7 @@ fn build(specs: &[String], out: &Path, report_rejects: bool) -> Result<()> {
             .collect(),
         // Popup blocks need normal exception precedence; scoped exceptions
         // also govern cosmetic filtering.
-        exceptions: db
-            .exceptions
-            .iter()
-            .cloned()
-            .collect(),
+        exceptions: db.exceptions.clone(),
         removeparam: Vec::new(),
         cosmetic: db.cosmetic.clone(),
         stats: db.stats.clone(),
