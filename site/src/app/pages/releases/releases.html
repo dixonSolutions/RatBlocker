@@ -1,0 +1,93 @@
+<div class="prose page">
+  <h1>Releases</h1>
+  <p class="lede">
+    Nothing has been published yet. This page describes what a build produces today, so you can see
+    what a release will contain before there is one to download.
+  </p>
+
+  <div class="release">
+    <div class="release__head">
+      <h2>v0.1.0</h2>
+      <p-tag value="Unreleased" severity="warn" />
+    </div>
+    <p class="muted">
+      The first version. The engine, the compiler, the Linux daemon and both browser extensions
+      work and are covered by tests; the desktop and mobile frontends are not written yet.
+    </p>
+
+    <h3>What is in it</h3>
+    <ul class="changes">
+      @for (change of changes; track change) {
+        <li>{{ change }}</li>
+      }
+    </ul>
+
+    <h3>Artifacts</h3>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>File</th><th>What it is</th><th>Size</th><th>SHA-256</th></tr>
+        </thead>
+        <tbody>
+          @for (artifact of artifacts; track artifact.file) {
+            <tr>
+              <td><code>{{ artifact.file }}</code></td>
+              <td class="wrap muted">{{ artifact.what }}</td>
+              <td>{{ size(artifact.bytes) }}</td>
+              <td><code class="hash">{{ short(artifact.checksum) }}</code></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">
+      Sizes and checksums are read from the last compile rather than typed in, so they describe a
+      build that actually happened.
+    </p>
+
+    <h3>Filter lists compiled in</h3>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>List</th><th>Version</th><th>Rules</th><th>Source SHA-256</th></tr>
+        </thead>
+        <tbody>
+          @for (source of facts.sources; track source.id) {
+            <tr>
+              <td>{{ source.title }}</td>
+              <td><code>{{ source.version ?? '—' }}</code></td>
+              <td>{{ source.ruleCount.toLocaleString() }}</td>
+              <td><code class="hash">{{ short(source.checksum) }}</code></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Known gaps</h3>
+    <ul class="changes gaps">
+      @for (gap of known; track gap) {
+        <li>{{ gap }}</li>
+      }
+    </ul>
+  </div>
+
+  <p-message severity="info" [closable]="false">
+    Until there is a tagged release, build from source — the
+    <a routerLink="/install">install page</a> has the commands. Every artifact above is
+    reproducible from a checkout.
+  </p-message>
+
+  <h2>How releases will work</h2>
+  <p>
+    Tagged releases will carry the artifacts above with their checksums, and the filter database
+    will be signed so an update can be verified before it is activated. The update path already
+    stages a download, proves it compiles into a working engine, and only then swaps it in — with
+    the previous database kept for rollback.
+  </p>
+  <p>
+    The Chromium extension is signed with a project key and self-hosted, so updates arrive through
+    an update manifest rather than a store. The Firefox extension needs Mozilla's signature for
+    release Firefox; Gecko forks can take it unsigned.
+  </p>
+</div>

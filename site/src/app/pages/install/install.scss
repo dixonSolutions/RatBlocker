@@ -1,0 +1,14 @@
+.page { padding: 3rem 0 0; }
+
+/* Optimus tab panels have no padding of their own; prose needs room to breathe.
+   The :not([hidden]) guard matters — TabPanel hides an inactive panel with the
+   `hidden` attribute, which only works through the user-agent stylesheet, so an
+   unguarded `display: block` here makes every panel render at once. */
+p-tabpanel:not([hidden]) {
+  display: block;
+  padding-top: 1.25rem;
+}
+
+h3:first-child { margin-top: 0.5rem; }
+
+p-message { display: block; margin-bottom: 1.25rem; }

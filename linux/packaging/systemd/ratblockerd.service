@@ -1,0 +1,52 @@
+[Unit]
+Description=RatBlocker filtering daemon
+Documentation=man:ratblockerd(8) https://github.com/ratblocker/ratblocker
+After=network.target dbus.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/ratblockerd --settings /etc/ratblocker/daemon.yaml
+Restart=on-failure
+RestartSec=2s
+
+# The daemon needs no privileges beyond binding a low port, so it runs as its
+# own unprivileged account and everything else is taken away (§16).
+User=ratblocker
+Group=ratblocker
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+
+# Filesystem: read-only system, no access to anyone's home directory, and one
+# writable state directory.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+StateDirectory=ratblocker
+StateDirectoryMode=0750
+ReadWritePaths=/var/lib/ratblocker
+
+# Kernel and process isolation.
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Only the address families a DNS proxy and an HTTPS client actually need.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

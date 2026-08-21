@@ -1,0 +1,42 @@
+{
+  "name": "site",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "build:pages": "ng build --configuration production",
+    "facts": "node tools/generate-facts.mjs",
+    "prebuild": "node tools/generate-facts.mjs && node tools/sync-assets.mjs"
+  },
+  "private": true,
+  "packageManager": "npm@12.0.2",
+  "dependencies": {
+    "@angular/cdk": "^22.1.3",
+    "@angular/common": "^22.1.0",
+    "@angular/compiler": "^22.1.0",
+    "@angular/core": "^22.1.0",
+    "@angular/forms": "^22.1.0",
+    "@angular/platform-browser": "^22.1.0",
+    "@angular/platform-server": "^22.1.0",
+    "@angular/router": "^22.1.0",
+    "@angular/ssr": "^22.1.4",
+    "@openng/icons": "^1.0.0",
+    "@openng/optimus-ui": "^2.0.1",
+    "@openng/optimus-ui-themes": "^2.0.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.1.4",
+    "@angular/cli": "^22.1.4",
+    "@angular/compiler-cli": "^22.1.0",
+    "@types/node": "^20.17.19",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.8"
+  }
+}

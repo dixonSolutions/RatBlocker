@@ -1,0 +1,46 @@
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="shell header-inner">
+    <a class="brand" routerLink="/" aria-label="RatBlocker home">
+      <img src="design/icon.svg" alt="" width="30" height="30" />
+      <span class="brand__name">RatBlocker</span>
+    </a>
+
+    <nav class="site-nav" aria-label="Main">
+      @for (item of nav; track item.path) {
+        <a [routerLink]="item.path" routerLinkActive="is-active">{{ item.label }}</a>
+      }
+    </nav>
+
+    <div class="header-actions">
+      <button
+        type="button"
+        class="theme-toggle"
+        (click)="toggleTheme()"
+        [attr.aria-pressed]="dark()"
+        aria-label="Toggle dark mode"
+      >
+        {{ dark() ? 'Light' : 'Dark' }}
+      </button>
+      <a [href]="project.repository" rel="noopener">
+        <p-button label="GitHub" severity="secondary" size="small"/>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <router-outlet />
+</main>
+
+<footer class="site-footer">
+  <div class="shell footer-inner">
+    <p class="muted">
+      {{ project.name }} is free software under {{ project.license }}. Bundled filter lists carry
+      their own licences — see
+      <a [href]="project.repository + '/blob/master/README.md#licensing'" rel="noopener">Licensing</a>.
+    </p>
+    <p class="muted">No trackers on this site either. It is static files and nothing else.</p>
+  </div>
+</footer>

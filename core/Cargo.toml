@@ -1,0 +1,19 @@
+[package]
+name = "ratblocker-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared filtering core for RatBlocker: rule parsing, matching and decisions."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+regex = "1"
+
+[dev-dependencies]
+postcard = { version = "1", features = ["use-std"] }
+
+[features]
+default = []

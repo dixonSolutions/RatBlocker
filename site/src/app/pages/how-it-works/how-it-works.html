@@ -1,0 +1,127 @@
+<div class="prose page">
+  <h1>How it works</h1>
+  <p class="lede">
+    One engine, three ways of reaching it. Everything below describes what the code actually does,
+    including where it gives up.
+  </p>
+
+  <h2>One engine, compiled twice</h2>
+  <p>
+    The filtering logic is a single Rust crate. It is compiled natively for the Linux daemon and to
+    WebAssembly for the browser extensions, which is what stops the two drifting apart: a rule that
+    blocks in Firefox blocks identically on the system layer, because it is literally the same code
+    reaching the same conclusion.
+  </p>
+  <p>
+    Filter lists are not parsed at startup. A compiler turns them into a versioned binary database
+    ahead of time, and the runtime loads that. It is why a fresh install starts blocking on the
+    first request without contacting anything.
+  </p>
+
+  <h2>The decision pipeline</h2>
+  <p>Every request walks the same seven steps, and stops at the first one that decides.</p>
+  <ol class="pipeline">
+    @for (step of pipeline; track step.title; let i = $index) {
+      <li>
+        <span class="pipeline__n">{{ i + 1 }}</span>
+        <div>
+          <strong>{{ step.title }}</strong>
+          <span class="muted">{{ step.detail }}</span>
+        </div>
+      </li>
+    }
+  </ol>
+
+  <p-message severity="info" [closable]="false">
+    Matching never scans the rule set. Rules are filed under the hostname they anchor to, or under
+    the rarest token in their pattern, so a request only ever examines the handful of rules it
+    could possibly match. That is what keeps a decision at roughly nine microseconds against
+    {{ (facts.rules.network + facts.rules.exceptions).toLocaleString() }} rules.
+  </p-message>
+
+  <h2>What each platform can do</h2>
+  <div class="table-scroll breakout">
+    <table>
+      <thead>
+        <tr><th>Platform</th><th>Mechanism</th><th>Engine</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        @for (row of platforms; track row.platform) {
+          <tr>
+            <td><strong>{{ row.platform }}</strong></td>
+            <td><code>{{ row.mechanism }}</code></td>
+            <td>{{ row.engine }}</td>
+            <td class="wrap muted">{{ row.note }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Fitting EasyList into Manifest V3</h2>
+  <p>
+    Chromium caps an extension at {{ facts.chromium.maxStaticRules.toLocaleString() }} static rules.
+    The compiled lists produce {{ facts.chromium.candidates.toLocaleString() }} candidates, so a
+    naive conversion has to throw most of them away — which is why several MV3 blockers cover far
+    less than their Manifest V2 versions did.
+  </p>
+  <p>
+    RatBlocker avoids that. The overwhelming majority of EasyList rules are plain domain blocks, and
+    Chromium's <code>requestDomains</code> condition already matches a domain and all its
+    subdomains. Collapsing them turns
+    {{ facts.chromium.collapsedDomains.toLocaleString() }} separate rules into
+    {{ facts.chromium.collapsedIntoRules }}.
+  </p>
+  <div class="figures">
+    <p-card>
+      <div class="figure">
+        <span class="figure__value">{{ facts.chromium.rulesEmitted.toLocaleString() }}</span>
+        <span class="figure__label">rules emitted, of {{ facts.chromium.maxStaticRules.toLocaleString() }} allowed</span>
+      </div>
+    </p-card>
+    <p-card>
+      <div class="figure">
+        <span class="figure__value">{{ facts.chromium.droppedOverBudget }}</span>
+        <span class="figure__label">rules dropped for want of budget</span>
+      </div>
+    </p-card>
+  </div>
+
+  <h2>Untrusted input, treated as such</h2>
+  <p>
+    A filter list is a file from the internet, so the parser is written as though every list is
+    hostile. Patterns too generic to index are refused. Regular expressions are size-capped and run
+    on a linear-time engine, so a crafted pattern cannot hang the browser.
+    <code>$redirect</code> targets must name a resource RatBlocker ships — an early version accepted
+    a full URL, which would have let a list quietly redirect your traffic anywhere.
+  </p>
+  <p>
+    Rules that cannot be honoured are rejected and counted, never ignored in silence. The current
+    lists yield <strong>{{ facts.rejected }}</strong> rejections, and every build writes them out
+    with a reason attached.
+  </p>
+
+  <h2>Where it stops</h2>
+  <p-accordion [value]="['0']" [multiple]="true">
+    @for (limit of limitations; track limit.scope; let i = $index) {
+      <p-accordion-panel [value]="i.toString()">
+        <p-accordion-header>{{ limit.scope }}</p-accordion-header>
+        <p-accordion-content>
+          <p class="muted">{{ limit.detail }}</p>
+        </p-accordion-content>
+      </p-accordion-panel>
+    }
+  </p-accordion>
+
+  <h2>Authorization is the daemon's job</h2>
+  <p>
+    The Linux service exposes a D-Bus API, and every call that changes something is checked against
+    Polkit inside the daemon. A greyed-out button in a settings window is a courtesy to the user,
+    not a security control — so the daemon assumes its callers may be lying and asks anyway.
+  </p>
+  <p>
+    It runs under its own account with one capability, <code>CAP_NET_BIND_SERVICE</code>, and
+    nothing else. Installing it does not redirect your DNS; that is a separate unit you enable
+    deliberately, and stopping it puts your resolver configuration back.
+  </p>
+</div>

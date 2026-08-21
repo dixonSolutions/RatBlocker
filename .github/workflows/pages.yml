@@ -1,0 +1,92 @@
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'site/**'
+      - 'design/**'
+      - 'filter-lists/**'
+      - 'core/**'
+      - 'filter-compiler/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Pages needs these; nothing here writes to the repository.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. Queued rather than cancelled, so a push during a
+# deploy still ends up published rather than being silently dropped.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The site's rule counts, database sizes and list versions are generated
+      # from the filter compiler's own output, so the compiler has to run
+      # before the site is built. It is also a free correctness check: if the
+      # lists stop compiling, the site fails rather than publishing stale
+      # numbers.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build the filter compiler
+        run: cargo build --release -p ratblocker-filter-compiler
+
+      - name: Compile filter lists
+        run: |
+          ./target/release/ratblocker-compile build \
+            --list easylist=filter-lists/bundled/easylist.txt \
+            --list easyprivacy=filter-lists/bundled/easyprivacy.txt \
+            --out dist
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+
+      # Derive the base href from the repository name so the site keeps working
+      # if the repository is renamed, and so a fork does not have to edit
+      # angular.json to deploy its own copy.
+      - name: Build the site
+        working-directory: site
+        run: npm run build -- --base-href "/${GITHUB_REPOSITORY#*/}/"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist/site/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

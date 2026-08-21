@@ -1,0 +1,168 @@
+/*
+ * Global styles.
+ *
+ * The Optimus Aura preset supplies the component design tokens; everything
+ * here either re-points those tokens at RatBlocker's own accent or styles the
+ * plain prose that a documentation site is mostly made of.
+ */
+
+/* Optimus injects its component CSS at runtime from the theme preset and puts
+   it in a layer, so page styles below win without an arms race of
+   specificity. */
+@layer theme, base, optimus, site;
+
+:root {
+  /* The accent is the same value the extension UI and the icon use, so the
+     site, the popup and the toolbar mark are recognisably one thing. */
+  --rb-accent: #8b1e3f;
+  --rb-accent-soft: #b8567a;
+  --rb-ink: #16161a;
+  --rb-muted: #5c5c69;
+  --rb-bg: #ffffff;
+  --rb-surface: #f7f7f9;
+  --rb-border: #e2e2e8;
+  --rb-code-bg: #f4f4f6;
+
+  --p-primary-color: var(--rb-accent);
+  --p-primary-contrast-color: #ffffff;
+  --p-primary-hover-color: #74152f;
+  --p-primary-active-color: #5e0f25;
+  --p-content-border-radius: 10px;
+}
+
+html.dark {
+  --rb-accent: #e0698a;
+  --rb-accent-soft: #b8567a;
+  --rb-ink: #f2f2f5;
+  --rb-muted: #a3a3b2;
+  --rb-bg: #131317;
+  --rb-surface: #1c1c22;
+  --rb-border: #33333d;
+  --rb-code-bg: #1a1a20;
+
+  --p-primary-color: var(--rb-accent);
+  --p-primary-contrast-color: #1a1013;
+  --p-primary-hover-color: #eb8ca5;
+  --p-primary-active-color: #f4aec1;
+}
+
+@layer site {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background: var(--rb-bg);
+    color: var(--rb-ink);
+    font: 16px/1.65 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.5em;
+  }
+
+  h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; }
+  h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 650; margin-top: 2.5rem; }
+  h3 { font-size: 1.15rem; font-weight: 650; margin-top: 1.75rem; }
+
+  p { margin: 0 0 1rem; }
+  a { color: var(--rb-accent); }
+
+  code,
+  kbd {
+    background: var(--rb-code-bg);
+    border: 1px solid var(--rb-border);
+    border-radius: 5px;
+    padding: 0.1em 0.35em;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.88em;
+  }
+
+  /* Wide content must scroll inside its own box; the page itself never does. */
+  pre {
+    margin: 0 0 1.25rem;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    background: var(--rb-code-bg);
+    border: 1px solid var(--rb-border);
+    border-radius: 10px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+
+    code {
+      background: none;
+      border: 0;
+      padding: 0;
+      font-size: inherit;
+    }
+  }
+
+  .shell {
+    width: min(100% - 2.5rem, 68rem);
+    margin-inline: auto;
+  }
+
+  .prose {
+    width: min(100% - 2.5rem, 48rem);
+    margin-inline: auto;
+  }
+
+  .lede {
+    font-size: 1.15rem;
+    color: var(--rb-muted);
+  }
+
+  .muted { color: var(--rb-muted); }
+
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--rb-border);
+    border-radius: 10px;
+  }
+
+  /* A table with a prose column in it needs more room than the reading measure
+     allows. On a wide viewport let it spill symmetrically past the text
+     column; below that it just scrolls inside its own box. */
+  @media (min-width: 66rem) {
+    .prose .breakout {
+      width: 60rem;
+      margin-left: -6rem;
+    }
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+
+  th,
+  td {
+    padding: 0.7rem 0.9rem;
+    text-align: left;
+    border-bottom: 1px solid var(--rb-border);
+    white-space: nowrap;
+  }
+
+  th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--rb-muted);
+    background: var(--rb-surface);
+  }
+
+  tbody tr:last-child td { border-bottom: 0; }
+  td.wrap { white-space: normal; }
+}

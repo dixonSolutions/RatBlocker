@@ -1,0 +1,172 @@
+<div class="prose page">
+  <h1>Install</h1>
+  <p class="lede">
+    Nothing here goes through an app store. Build it yourself, or take the release artifacts and
+    install them locally.
+  </p>
+
+  <p-message severity="warn" [closable]="false">
+    RatBlocker is at v0.1.0 and has not been through a security audit. It filters correctly and is
+    covered by tests, but treat it as early software.
+  </p-message>
+
+  <h2>Build it first</h2>
+  <p>
+    Every install path starts from a build. You need Rust 1.82 or newer and Node 20.11 or newer.
+  </p>
+  <pre><code>git clone {{ project.repository }}.git
+cd RatBlocker
+cargo build --release
+
+# Compile the bundled filter lists into dist/
+./target/release/ratblocker-compile build \
+    --list easylist=filter-lists/bundled/easylist.txt \
+    --list easyprivacy=filter-lists/bundled/easyprivacy.txt \
+    --out dist
+
+# Build the engine for the browser, then both extensions
+rustup target add wasm32-unknown-unknown
+cargo build --release -p ratblocker-wasm --target wasm32-unknown-unknown
+cd extensions &amp;&amp; npm install &amp;&amp; node build.mjs</code></pre>
+
+  <h2>Pick a platform</h2>
+  <p-tabs value="linux">
+    <p-tablist>
+      <p-tab value="linux">Linux</p-tab>
+      <p-tab value="chromium">Chromium</p-tab>
+      <p-tab value="firefox">Firefox &amp; forks</p-tab>
+    </p-tablist>
+
+    <p-tabpanels>
+      <p-tabpanel value="linux">
+        <h3>The system daemon</h3>
+        <p>
+          Covers every application on the machine, not just the browser. It runs under its own
+          unprivileged account and answers DNS on <code>127.0.0.2:53</code>.
+        </p>
+        <pre><code>sudo bash linux/packaging/install.sh
+sudo systemctl enable --now ratblockerd
+ratblocker status</code></pre>
+
+        <p>
+          At this point the daemon is running but nothing is sending it queries. Routing the system
+          through it is a deliberate second step:
+        </p>
+        <pre><code>sudo systemctl enable --now ratblocker-dns</code></pre>
+
+        <p-message severity="info" [closable]="false">
+          The DNS redirection lives in its own unit so that stopping it restores your resolver
+          configuration, and so a reboot returns you to stock DNS even if something went wrong. The
+          drop-in it writes lives under <code>/run</code> for exactly that reason.
+        </p-message>
+
+        <h3>Driving it</h3>
+        <pre><code>ratblocker status            # what is loaded, and what it has blocked
+ratblocker pause 10m         # step out of the way for a bit
+ratblocker allow add news.example
+ratblocker update            # refresh the filter lists
+ratblocker filters list</code></pre>
+        <p>
+          Everything goes through D-Bus, and every change is authorized by Polkit in the daemon.
+          The command-line client holds no privileges of its own.
+        </p>
+
+        <h3>Removing it</h3>
+        <pre><code>sudo bash linux/packaging/uninstall.sh</code></pre>
+        <p class="muted">
+          Restores DNS first, then removes the files. Your configuration and rule database are left
+          behind on purpose; the script tells you how to delete them.
+        </p>
+      </p-tabpanel>
+
+      <p-tabpanel value="chromium">
+        <h3>Chromium, without the Web Store</h3>
+        <p>
+          Chromium on Linux can install an extension from a local CRX through its external
+          extension mechanism. No store, no developer-mode flag, and it survives restarts.
+        </p>
+        <pre><code>cd extensions &amp;&amp; node package.mjs chromium
+
+sudo install -Dm644 dist/ratblocker-chromium.crx \
+    /usr/share/ratblocker/ratblocker-chromium.crx
+sudo install -Dm644 dist/{{ project.chromiumExtensionId }}.json \
+    /usr/share/chromium/extensions/</code></pre>
+
+        <p>
+          The extension id is derived from the signing key that <code>package.mjs</code> generates
+          on first run.
+        </p>
+        <p-message severity="warn" [closable]="false">
+          Keep <code>chromium-signing-key.pem</code> and back it up. The extension id comes from it,
+          so losing it changes the id and orphans every existing install. It is gitignored — do not
+          commit it.
+        </p-message>
+
+        <h3>Hosting it remotely</h3>
+        <p>
+          To update installs from a server rather than by hand, publish the CRX alongside
+          <code>chromium-update.xml</code> and deploy the generated policy:
+        </p>
+        <pre><code>sudo install -Dm644 dist/chromium-policy.json \
+    /etc/chromium/policies/managed/ratblocker.json</code></pre>
+        <p class="muted">
+          Set <code>RATBLOCKER_UPDATE_BASE</code> when packaging so the manifest points at your
+          host rather than the placeholder.
+        </p>
+      </p-tabpanel>
+
+      <p-tabpanel value="firefox">
+        <h3>The signing situation, honestly</h3>
+        <p>
+          Release Firefox will not permanently install an unsigned extension. There is no
+          preference, no enterprise policy and no local file that changes this — Mozilla removed
+          those routes years ago, and self-signing is not a thing Firefox recognises.
+        </p>
+        <p>So there are two honest options.</p>
+
+        <h3>Option 1 — a Gecko fork that does not enforce signing</h3>
+        <p>
+          <p-tag value="No Mozilla account" severity="success" /> Forks built without
+          <code>MOZ_REQUIRE_SIGNING</code> take the unsigned XPI directly and keep it across
+          restarts. Zen, LibreWolf, Waterfox and Mullvad Browser all qualify, as do Mozilla's own
+          Developer Edition, Nightly, ESR and unbranded builds.
+        </p>
+        <pre><code>cd extensions &amp;&amp; node package.mjs firefox</code></pre>
+        <p>
+          Set <code>xpinstall.signatures.required</code> to <code>false</code> in
+          <code>about:config</code>, then <em>about:addons → gear → Install Add-on From File</em>
+          and pick <code>dist/ratblocker-firefox-0.1.0.xpi</code>.
+        </p>
+        <p>Not sure whether a given build enforces signing? Ask it:</p>
+        <pre><code>node tests/browser/gecko-signing.mjs /path/to/browser dist/ratblocker-firefox-0.1.0.xpi</code></pre>
+        <p class="muted">
+          It attempts a permanent unsigned install and tells you which category the build falls
+          into. A temporary install would prove nothing, since that bypasses the check anyway.
+        </p>
+
+        <h3>Option 2 — unlisted signing on AMO</h3>
+        <p>
+          Mozilla will sign an extension without publishing it. Unlisted signing has no review
+          queue and nothing appears in the public directory; you host the file and its updates
+          yourself. It needs an
+          <a href="https://addons.mozilla.org/developers/addon/api/key/" rel="noopener">AMO API key</a>.
+        </p>
+        <pre><code>export AMO_JWT_ISSUER=user:12345:67
+export AMO_JWT_SECRET=...
+node extensions/sign-firefox.mjs</code></pre>
+        <p class="muted">
+          Produces a signed XPI plus <code>firefox-updates.json</code>, the manifest Firefox polls
+          for self-hosted updates. A signed XPI installs everywhere, forks included, so signing
+          once covers every Gecko browser.
+        </p>
+
+        <h3>Using it in a Flatpak browser</h3>
+        <p>
+          A sandboxed browser can only read files it has been granted. Put the XPI somewhere it can
+          reach — <code>~/Downloads</code> is granted by default in most browser Flatpaks — or open
+          up access with Flatseal.
+        </p>
+      </p-tabpanel>
+    </p-tabpanels>
+  </p-tabs>
+</div>

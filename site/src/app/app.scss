@@ -1,0 +1,99 @@
+/* Shell chrome: header, navigation and footer. */
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  padding: 0.6rem 1rem;
+  background: var(--rb-accent);
+  color: #fff;
+  z-index: 100;
+
+  &:focus {
+    left: 0;
+  }
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--rb-bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  min-height: 62px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand__name { font-size: 1.05rem; }
+
+.site-nav {
+  display: flex;
+  gap: 1.25rem;
+  margin-right: auto;
+  font-size: 0.95rem;
+
+  a {
+    color: var(--rb-muted);
+    text-decoration: none;
+    padding: 0.2rem 0;
+    border-bottom: 2px solid transparent;
+
+    &:hover { color: var(--rb-ink); }
+
+    &.is-active {
+      color: var(--rb-ink);
+      border-bottom-color: var(--rb-accent);
+    }
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.theme-toggle {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--rb-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rb-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover { color: var(--rb-ink); border-color: var(--rb-accent); }
+}
+
+.site-footer {
+  margin-top: 5rem;
+  padding: 2rem 0 3rem;
+  border-top: 1px solid var(--rb-border);
+  font-size: 0.9rem;
+}
+
+.footer-inner p { margin: 0 0 0.4rem; }
+
+/* The navigation is the first thing to run out of room on a phone. */
+@media (max-width: 620px) {
+  .header-inner { gap: 0.8rem; flex-wrap: wrap; min-height: 0; padding-block: 0.7rem; }
+  .site-nav { order: 3; width: 100%; gap: 1rem; }
+  .header-actions { margin-left: auto; }
+}

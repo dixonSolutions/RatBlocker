@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"
+     role="img" aria-label="RatBlocker">
+  <title>RatBlocker</title>
+
+  <!--
+    Authoritative source for every RatBlocker icon. Hand-authored: edit this,
+    then re-run the render command in design/README.md.
+
+    Two jobs, split between two shapes. The shield carries the silhouette at
+    16px, where it is the only thing a browser toolbar can resolve, and it is
+    what says "blocker". The rodent head inside it says "rat", and only has to
+    read from 32px up.
+
+    What makes the head legible is the ear: it sits high and to the back so it
+    breaks the skull's outline as a distinct bump, rather than merging into it
+    and leaving an anonymous blob. The snout is deliberately short and blunt —
+    a long taper looks elegant at 512px and dissolves at 32px.
+  -->
+  <path fill="#8b1e3f"
+        d="M64 5 112 22 Q118 24 118 30 V58 C118 88 98 111 66 123 Q64 124 62 123
+           C30 111 10 88 10 58 V30 Q10 24 16 22 Z"/>
+
+  <!--
+    Head in profile, facing left. Drawn on its own 128 grid so design/banner.svg
+    can reuse this group verbatim, then scaled into the shield's safe area.
+
+    Authored as one closed outline rather than a union of circles and wedges.
+    Unions kept collapsing into an anonymous teardrop: the ear merged into the
+    skull and the muzzle read as a flag.
+
+    The whiskers are doing more work than they look. A tapered muzzle with a
+    round ear reads just as easily as a bird — muzzle as beak, ear as skull —
+    and no amount of reshaping the outline fixed that. Three strokes leaving
+    the snout settle it instantly. They fall below a pixel at 16px and simply
+    disappear, which is fine: at that size the shield is carrying the mark.
+  -->
+  <g transform="translate(65 66) scale(0.64) translate(-58 -53)">
+    <g stroke="#fff" stroke-width="4.5" stroke-linecap="round" fill="none">
+      <path d="M14 70 C 6 65, 1 61, -3 57"/>
+      <path d="M12 76 C 5 74, 0 73, -4 72"/>
+      <path d="M14 82 C 8 82, 4 81, 0 80"/>
+    </g>
+
+    <path fill="#fff" d="
+      M 10 74
+      C 20 65, 32 55, 46 47
+      C 55 42, 60 40, 64 37
+      C 65 19, 77 5, 90 9
+      C 104 13, 107 32, 99 43
+      C 107 55, 106 72, 95 83
+      C 82 96, 60 100, 44 92
+      C 32 86, 20 80, 10 74
+      Z"/>
+
+    <!-- Knocked out of the white, not drawn on top: gives the eye a hard edge. -->
+    <circle cx="48" cy="64" r="7.5" fill="#8b1e3f"/>
+  </g>
+</svg>

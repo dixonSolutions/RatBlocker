@@ -1,0 +1,33 @@
+.page { padding: 3rem 0 0; }
+
+.release {
+  padding: 1.5rem 1.6rem;
+  border: 1px solid var(--rb-border);
+  border-radius: 14px;
+  background: var(--rb-surface);
+  margin-bottom: 2rem;
+}
+
+.release__head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+
+  h2 { margin: 0; }
+}
+
+.changes {
+  margin: 0 0 1.5rem;
+  padding-left: 1.15rem;
+
+  li { margin-bottom: 0.35rem; }
+}
+
+.gaps { color: var(--rb-muted); }
+
+.hash {
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+p-message { display: block; margin-bottom: 1.5rem; }

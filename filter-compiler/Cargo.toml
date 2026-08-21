@@ -1,0 +1,20 @@
+[package]
+name = "ratblocker-filter-compiler"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Compiles filter lists into RatBlocker's versioned rule database and per-platform rulesets."
+
+[[bin]]
+name = "ratblocker-compile"
+path = "src/main.rs"
+
+[dependencies]
+ratblocker-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+postcard = { version = "1", features = ["use-std"] }
+sha2 = "0.10"

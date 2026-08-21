@@ -1,0 +1,16 @@
+[package]
+name = "ratblocker-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "WebAssembly binding for the RatBlocker filtering core."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ratblocker-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+postcard = { version = "1", features = ["use-std"] }

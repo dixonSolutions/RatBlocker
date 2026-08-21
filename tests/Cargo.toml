@@ -1,0 +1,15 @@
+[package]
+name = "ratblocker-tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Cross-cutting compatibility, performance and security tests."
+
+[dependencies]
+ratblocker-core = { workspace = true }
+
+[dev-dependencies]
+postcard = { version = "1", features = ["use-std"] }
+serde_json = { workspace = true }

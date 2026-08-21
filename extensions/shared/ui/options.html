@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>RatBlocker settings</title>
+<link rel="stylesheet" href="ui.css" />
+<body class="options">
+  <h1 class="wordmark">
+    <img class="wordmark__icon" src="../icons/icon-32.png" alt="" width="20" height="20" />
+    RatBlocker
+  </h1>
+  <p class="lede">
+    Local, private ad and tracker filtering. Nothing here leaves your device.
+  </p>
+
+  <section class="section">
+    <h2>Filter subscriptions</h2>
+    <p class="hint">Lists bundled with this extension. Attribution is preserved in ATTRIBUTION.txt.</p>
+    <ul class="list" id="subscriptions"></ul>
+  </section>
+
+  <section class="section">
+    <h2>Allowed sites</h2>
+    <p class="hint">Filtering is switched off entirely on these domains and their subdomains.</p>
+    <ul class="list" id="allowlist"></ul>
+    <div class="actions">
+      <input type="text" id="allow-input" placeholder="example.com" aria-label="Domain to allow" />
+      <button type="button" class="button button--primary" id="allow-add">Add</button>
+    </div>
+    <p class="notice" id="allow-error" hidden></p>
+  </section>
+
+  <section class="section">
+    <h2>Custom rules</h2>
+    <p class="hint">
+      One EasyList-syntax rule per line, for example <code>||ads.example.com^</code> to block or
+      <code>@@||example.com/needed.js</code> to allow. These take precedence over the subscriptions.
+    </p>
+    <textarea id="custom-rules" spellcheck="false" aria-label="Custom rules"></textarea>
+  </section>
+
+  <section class="section">
+    <h2>Privacy</h2>
+    <p class="hint">Off by default. RatBlocker has no account, no cloud and no analytics.</p>
+    <ul class="list">
+      <li>
+        <label class="switch switch--compact">
+          <input type="checkbox" id="statistics" />
+          <span class="switch__track" aria-hidden="true"></span>
+          <span class="switch__label">Count blocked requests locally</span>
+        </label>
+        <button type="button" class="link" id="reset-stats">Clear counts</button>
+      </li>
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>Diagnostics</h2>
+    <p class="hint">What the filtering engine currently has loaded.</p>
+    <pre class="diagnostics" id="diagnostics">Loading…</pre>
+  </section>
+
+  <div class="actions">
+    <button type="button" class="button button--primary" id="save">Save changes</button>
+    <span id="saved" class="notice notice--ok" hidden>Saved.</span>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>

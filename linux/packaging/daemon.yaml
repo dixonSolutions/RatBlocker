@@ -1,0 +1,56 @@
+# RatBlocker daemon settings.
+#
+# This file is the administrator's; per-user filtering choices (allowlist,
+# subscriptions, privacy) live in /var/lib/ratblocker/config.yaml and are
+# changed through the D-Bus API, the CLI or the settings app.
+
+# Addresses the DNS proxy binds. Local addresses only — RatBlocker refuses to
+# start on a routable address, so it cannot become an open resolver.
+#
+# 127.0.0.2 rather than 127.0.0.1: systemd-resolved already owns 127.0.0.53
+# and often 127.0.0.1, and taking those would be a fight with the system
+# resolver rather than a partnership with it.
+listen:
+  - 127.0.0.2:53
+
+# Where allowed queries go. The first that answers wins.
+#
+# `system` means "whatever this machine already uses", read from
+# /run/systemd/resolve/resolv.conf. That matters on networks that only permit
+# their own DNS server, and it is what keeps internal names resolving. The
+# public resolvers below are a fallback for when no system resolver is found.
+upstream:
+  - protocol: system
+  - protocol: plain
+    address: 9.9.9.9:53
+  - protocol: plain
+    address: 149.112.112.112:53
+
+# For encrypted upstream DNS, use TLS instead:
+# upstream:
+#   - protocol: tls
+#     address: 9.9.9.9:853
+#     server_name: dns.quad9.net
+
+upstream_timeout_seconds: 5
+
+cache:
+  entries: 4096
+  # Floor on upstream TTLs, so a one-second TTL does not turn every page load
+  # into a round trip.
+  minimum_ttl_seconds: 30
+
+# How a blocked name is answered: nx-domain, zero-address or refused.
+block_response: nx-domain
+block_ttl_seconds: 60
+
+# Largest filter list the updater will download.
+max_download_bytes: 67108864
+
+paths:
+  configuration: /var/lib/ratblocker/config.yaml
+  database: /var/lib/ratblocker/rules.rbdb
+  staging: /var/lib/ratblocker/staging
+  last_known_good: /var/lib/ratblocker/rules.rbdb.last-known-good
+  bundled_filters: /usr/share/ratblocker/filters
+  trusted_key: /usr/share/ratblocker/update-signing.pub

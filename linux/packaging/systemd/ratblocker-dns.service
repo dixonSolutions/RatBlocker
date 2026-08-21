@@ -1,0 +1,23 @@
+[Unit]
+Description=Route system DNS through RatBlocker
+Documentation=https://github.com/ratblocker/ratblocker
+# Tied to the daemon: if filtering stops, the DNS redirection is undone rather
+# than left pointing at a socket nobody is listening on.
+After=ratblockerd.service systemd-resolved.service
+BindsTo=ratblockerd.service
+PartOf=ratblockerd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# The helper takes a fixed subcommand and reads the address from the daemon's
+# own settings file. It accepts no paths and no arbitrary arguments (§16).
+ExecStart=/usr/libexec/ratblocker/ratblocker-helper dns-apply
+ExecStop=/usr/libexec/ratblocker/ratblocker-helper dns-restore
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/systemd/resolved.conf.d
+
+[Install]
+WantedBy=multi-user.target

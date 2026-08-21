@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>RatBlocker</title>
+<link rel="stylesheet" href="ui.css" />
+<body class="popup">
+  <header class="header">
+    <h1 class="wordmark">
+      <img class="wordmark__icon" src="../icons/icon-32.png" alt="" width="20" height="20" />
+      RatBlocker
+    </h1>
+    <span id="status-pill" class="pill" aria-live="polite">Checking…</span>
+  </header>
+
+  <section class="panel">
+    <div class="row row--primary">
+      <label class="switch">
+        <input type="checkbox" id="enabled" />
+        <span class="switch__track" aria-hidden="true"></span>
+        <span class="switch__label">Protection</span>
+      </label>
+    </div>
+
+    <p id="engine-error" class="notice notice--error" hidden></p>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel__title">This site</h2>
+    <p id="site-host" class="site-host">—</p>
+    <div class="row">
+      <label class="switch switch--compact">
+        <input type="checkbox" id="allow-site" />
+        <span class="switch__track" aria-hidden="true"></span>
+        <span class="switch__label">Allow ads on this site</span>
+      </label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel__title">Blocked</h2>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat__value" id="blocked-tab">—</span>
+        <span class="stat__label">this page</span>
+      </div>
+      <div class="stat">
+        <span class="stat__value" id="blocked-total">—</span>
+        <span class="stat__label">this session</span>
+      </div>
+      <div class="stat">
+        <span class="stat__value" id="rules-loaded">—</span>
+        <span class="stat__label">rules</span>
+      </div>
+    </div>
+    <p id="stats-off" class="notice" hidden>
+      Counting is off. Turn it on in settings to see blocked totals.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel__title">Pause</h2>
+    <div class="row row--buttons">
+      <button type="button" class="button" data-pause="600">10 min</button>
+      <button type="button" class="button" data-pause="3600">1 hour</button>
+      <button type="button" class="button" id="resume" hidden>Resume now</button>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <button type="button" class="link" id="open-settings">Settings</button>
+  </footer>
+
+  <script type="module" src="popup.js"></script>
+</body>

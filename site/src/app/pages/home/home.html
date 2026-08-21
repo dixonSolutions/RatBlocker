@@ -1,0 +1,104 @@
+<section class="hero">
+  <div class="shell hero-inner">
+    <div class="hero-copy">
+      <p-tag value="Early — v0.1.0" severity="warn" />
+      <h1>Ad and tracker blocking that stays on your machine.</h1>
+      <p class="lede">
+        {{ project.name }} filters in two places at once: a browser extension that sees full URLs
+        and page elements, and a system service that covers every other application. One Rust
+        engine makes both decisions, so a rule behaves the same wherever it fires.
+      </p>
+      <div class="hero-actions">
+        <a routerLink="/install"><p-button label="Install" size="large"/></a>
+        <a routerLink="/how-it-works">
+          <p-button label="How it works" severity="secondary" [outlined]="true" size="large"/>
+        </a>
+      </div>
+      <p class="muted hero-note">
+        No account. No cloud. No HTTPS interception. {{ project.license }}.
+      </p>
+    </div>
+
+    <img class="hero-mark" src="design/icon.svg" alt="" width="220" height="220" />
+  </div>
+</section>
+
+<section class="shell stats">
+  @for (stat of stats; track stat.label) {
+    <div class="stat">
+      <span class="stat__value">{{ stat.value }}</span>
+      <span class="stat__label">{{ stat.label }}</span>
+    </div>
+  }
+</section>
+
+<section class="shell">
+  <h2>Two layers, because neither is enough alone</h2>
+  <div class="layer-grid">
+    @for (layer of layers; track layer.title) {
+      <p-card>
+        <ng-template #title>
+          <div class="layer-head">
+            <span>{{ layer.title }}</span>
+            <p-tag [value]="layer.tag" severity="secondary" />
+          </div>
+        </ng-template>
+        <p>{{ layer.body }}</p>
+      </p-card>
+    }
+  </div>
+  <p class="muted">
+    A DNS layer cannot hide an empty ad slot, and a browser extension cannot protect anything
+    outside the browser. Together they cover far more than either does by itself.
+    <a routerLink="/how-it-works">See exactly where each one stops.</a>
+  </p>
+</section>
+
+<section class="shell">
+  <h2>What it does not do</h2>
+  <ul class="promises">
+    @for (promise of promises; track promise.title) {
+      <li>
+        <strong>{{ promise.title }}</strong>
+        <span class="muted">{{ promise.detail }}</span>
+      </li>
+    }
+  </ul>
+</section>
+
+<section class="shell">
+  <h2>Built from lists you can check</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>List</th><th>Version</th><th>Rules</th><th>Licence</th></tr>
+      </thead>
+      <tbody>
+        @for (source of facts.sources; track source.id) {
+          <tr>
+            <td>
+              @if (source.homepage) {
+                <a [href]="source.homepage" rel="noopener">{{ source.title }}</a>
+              } @else {
+                {{ source.title }}
+              }
+            </td>
+            <td><code>{{ source.version ?? '—' }}</code></td>
+            <td>{{ source.ruleCount.toLocaleString() }}</td>
+            <td class="wrap">
+              @if (source.license) {
+                <a [href]="source.license" rel="noopener">Licence</a>
+              } @else {
+                <span class="muted">Not declared</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">
+    Every build records the source, version, licence and checksum of each list it compiled, and
+    ships that record alongside the artifact.
+  </p>
+</section>

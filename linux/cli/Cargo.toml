@@ -1,0 +1,18 @@
+[package]
+name = "ratblocker-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Command-line client for the RatBlocker daemon."
+
+[[bin]]
+name = "ratblocker"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

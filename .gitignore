@@ -1,0 +1,16 @@
+# Build output
+/target/
+/dist/
+node_modules/
+extensions/*/build/
+
+# Signing material. The Chromium extension id is derived from this key, so it
+# must be kept and backed up — but never committed.
+chromium-signing-key.pem
+*.pem
+!**/testdata/*.pem
+.amo-credentials
+
+# Editor and OS noise
+*.swp
+.DS_Store

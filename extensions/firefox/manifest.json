@@ -1,0 +1,61 @@
+{
+  "manifest_version": 2,
+  "name": "RatBlocker",
+  "version": "0.1.0",
+  "description": "Local, privacy-preserving ad and tracker filtering. No account, no cloud, no HTTPS interception.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ratblocker@ratblocker.github.io",
+      "strict_min_version": "128.0",
+      "update_url": "https://ratblocker.example/downloads/firefox-updates.json"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "webRequest",
+    "webRequestBlocking",
+    "webNavigation",
+    "tabs",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_title": "RatBlocker",
+    "default_popup": "ui/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "options_ui": {
+    "page": "ui/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    "redirects/*"
+  ]
+}
