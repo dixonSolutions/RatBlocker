@@ -368,11 +368,52 @@ const CHROMIUM = [
 
 const CRX_INSTALLED = '/usr/share/ratblocker/ratblocker-chromium.crx';
 
+/** The update address baked into the packed build, if it has been packaged. */
+async function chromiumUpdateUrl() {
+  try {
+    const manifest = JSON.parse(
+      await readFile(join(here, 'chromium/build/manifest.json'), 'utf8'),
+    );
+    return manifest.update_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function planChromium(browser, crx, descriptor, id) {
   const candidates = browser.binaries?.[PLATFORM] ?? [];
   const binary = candidates.map(onPath).find(Boolean)
     ?? (SIMULATED && candidates.length > 0 ? `${candidates[0]} (assumed)` : null);
   if (binary === null) return null;
+
+  /**
+   * Update mode is a no-op for an installed Chromium extension, and saying
+   * "needs root" here would be wrong. Root is required to *install*, because
+   * the external-extension directory is system-owned. Once installed the
+   * browser updates the extension itself, from the update_url inside the CRX,
+   * into the user's own profile — no privileges, and on Windows and macOS this
+   * is the only mechanism there has ever been.
+   */
+  if (UPDATE && !UNINSTALL && PLATFORM === 'linux') {
+    const target = join(browser.linuxExtensionDir, `${id}.json`);
+    if (existsSync(target)) {
+      let installedVersion = null;
+      try {
+        installedVersion = JSON.parse(await readFile(target, 'utf8')).external_version ?? null;
+      } catch {
+        // Unreadable descriptor: fall through and report it as installed.
+      }
+      const url = await chromiumUpdateUrl();
+      return {
+        browser: browser.name, binary, status: 'ok',
+        actions: [`installed${installedVersion ? ` (${installedVersion})` : ''}`],
+        note: url === null
+          ? 'the browser updates this itself; no update_url is packaged, so package with RATBLOCKER_UPDATE_BASE set'
+          : `the browser updates this itself from ${url} — nothing to do`,
+      };
+    }
+    // Not installed: fall through to the install plan, which needs root.
+  }
 
   const elevated = PLATFORM === 'win32' ? false : process.getuid?.() === 0;
   const policyDir = join(dist, 'policy');

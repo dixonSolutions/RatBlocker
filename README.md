@@ -251,6 +251,20 @@ that can reach the browsers, including `http://localhost:8080`. Chrome accepts
 plain HTTP for update manifests; Firefox requires HTTPS, but Gecko installs are
 updated by replacing the file in the profile and need no server at all.
 
+### Serving the downloads locally
+
+When publishing is not an option, `node serve.mjs` serves `dist/` over plain
+HTTP, which Chrome accepts for update manifests including on `localhost`:
+
+```sh
+RATBLOCKER_UPDATE_BASE=http://127.0.0.1:8080 node package.mjs
+node serve.mjs --port 8080
+```
+
+It binds loopback unless told otherwise. `RATBLOCKER_UPDATE_BASE` must match
+where the files will really be served from: the address is written into the
+artefacts when they are packaged, not when they are served.
+
 ### Chromium and Chrome, off-store, on every platform
 
 This works on Chrome as well as Chromium, and on all three desktop platforms —

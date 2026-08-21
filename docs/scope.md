@@ -123,3 +123,45 @@ That leaves enterprise policy, which names a URL rather than a file. The
 repository's GitHub Pages deployment serves it, so the requirement costs
 nothing; `http://localhost` also works, since Chrome accepts plain HTTP for
 update manifests.
+
+### The two cases that need more than file replacement
+
+**Chromium and Chrome on Linux need root — but only once.** The
+external-extension directory is system-owned, so the initial install is
+privileged. Updates are not. Once installed, the extension is an ordinary
+installed extension, and the browser updates it from the `update_url` inside
+the CRX into the user's own profile with no privileges at all. The external
+descriptor only bootstraps; Chrome will not downgrade a profile copy that is
+newer than `external_version`.
+
+So `install.mjs --update` reports an installed Chromium as up to date and does
+nothing, rather than asking for root it does not need. Root is only requested
+when the extension is genuinely absent.
+
+**Windows and macOS need a URL**, because policy is the only off-store route
+and policy names an address rather than a file. Two ways to provide one:
+
+- **Publish it.** The Pages workflow already does, at
+  `https://<owner>.github.io/<repo>/downloads/`. Nothing further is required.
+- **Serve it locally.** `node serve.mjs` serves `dist/` over plain HTTP, which
+  Chrome accepts for update manifests, including on `localhost`. Package with a
+  matching base so the URLs inside the artefacts agree:
+
+  ```sh
+  RATBLOCKER_UPDATE_BASE=http://127.0.0.1:8080 node package.mjs
+  node serve.mjs --port 8080
+  ```
+
+  It binds loopback by default, since it serves installable extension packages.
+  Run it as a login item on an isolated network and Chrome will poll it at
+  startup like any other update host.
+
+Gecko never needs either: `install.mjs --update` replaces the file in the
+profile and the browser picks it up at the next start.
+
+### One packaging rule to remember
+
+The update address is baked into the artefacts at packaging time, so
+`RATBLOCKER_UPDATE_BASE` must match wherever they will actually be served from.
+Packaging for Pages and then serving from localhost produces artefacts that
+point at Pages, and vice versa.
