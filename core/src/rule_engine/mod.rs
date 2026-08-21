@@ -413,6 +413,7 @@ impl Engine {
             application_id: ctx.application_id.as_deref(),
             resource_type: ctx.resource_type,
             party,
+            is_popup: ctx.is_popup,
         };
 
         // 4. Explicit user rules, in both directions, before any subscription.
@@ -514,6 +515,7 @@ impl Engine {
             application_id: None,
             resource_type: ResourceType::Document,
             party: Party::First,
+            is_popup: false,
         };
         let _ = doc_ctx;
         let mut suppress_generic = false;

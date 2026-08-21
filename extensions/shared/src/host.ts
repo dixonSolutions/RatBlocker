@@ -19,6 +19,7 @@ import {
   type Settings,
 } from './settings.js';
 import { Statistics } from './statistics.js';
+import type { FilterResult } from './types.js';
 import { RatBlockerEngine } from './wasm.js';
 
 /** Longest pause the UI offers, as a guard against an accidental forever-off. */
@@ -175,6 +176,29 @@ export class ExtensionHost {
     return this.settings.allowlist.some(
       (d) => host === d || host.endsWith(`.${d}`),
     );
+  }
+
+  /**
+   * Evaluate a newly created tab/window with popup context.
+   *
+   * Browser network APIs expose the destination URL but cannot express
+   * EasyList's `$popup` condition. Keeping this decision in the shared core
+   * gives Chromium and Firefox identical full-URL and first-party matching.
+   */
+  evaluatePopup(targetUrl: string, sourceUrl: string | null): FilterResult | null {
+    if (!this.filteringActive || this.engine === null) return null;
+    try {
+      return this.engine.evaluate({
+        request_url: targetUrl,
+        source_url: sourceUrl,
+        application_id: null,
+        resource_type: 'document',
+        is_popup: true,
+      });
+    } catch (error) {
+      console.error('RatBlocker: popup evaluation failed', error);
+      return null;
+    }
   }
 
   async handleMessage(message: Message, sender?: chrome.runtime.MessageSender): Promise<Response> {

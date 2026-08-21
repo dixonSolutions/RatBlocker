@@ -246,6 +246,7 @@ pub struct MatchContext<'a> {
     pub application_id: Option<&'a str>,
     pub resource_type: ResourceType,
     pub party: Party,
+    pub is_popup: bool,
 }
 
 /// Do this rule's options permit it to apply to the request?
@@ -255,6 +256,9 @@ fn options_match(rule: &NetworkRule, ctx: &MatchContext<'_>) -> bool {
         return false;
     }
     if !o.party.accepts(ctx.party) {
+        return false;
+    }
+    if o.popup.is_some_and(|required| required != ctx.is_popup) {
         return false;
     }
     if !o.domains.is_empty() && !o.domains.matches_host(ctx.source_host) {

@@ -137,6 +137,8 @@ pub struct DnrCondition {
 pub enum Unrepresentable {
     /// `$app=` has no meaning inside a browser.
     ApplicationScoped,
+    /// DNR sees a document request but not whether it opened a new tab/window.
+    PopupScoped,
     /// `$removeparam=~keep` cannot be expressed; DNR only removes named params.
     InvertedRemoveParam,
     /// Over the regex budget.
@@ -249,6 +251,9 @@ pub fn convert(
 ) -> Result<DnrRule, Unrepresentable> {
     if !rule.options.apps.is_empty() {
         return Err(Unrepresentable::ApplicationScoped);
+    }
+    if rule.options.popup.is_some() {
+        return Err(Unrepresentable::PopupScoped);
     }
 
     let mut condition = DnrCondition {

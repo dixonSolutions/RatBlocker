@@ -41,6 +41,7 @@ function onBeforeRequest(
       source_url: source,
       application_id: null,
       resource_type: resourceTypeFromBrowser(details.type),
+      is_popup: false,
     });
   } catch (error) {
     // A failure here must never break the page.
@@ -104,6 +105,29 @@ async function injectCosmetic(tabId: number, frameId: number, url: string): Prom
   }
 }
 
+/** Close a new tab/window when a filter rule matches it specifically as a popup. */
+async function inspectPopup(
+  details: chrome.webNavigation.WebNavigationSourceCallbackDetails,
+): Promise<void> {
+  if (host === null) return;
+  let sourceUrl: string | null = null;
+  try {
+    sourceUrl = (await api.tabs.get(details.sourceTabId)).url ?? null;
+  } catch {
+    // The opener may have closed before this event was handled.
+  }
+  const result = host.evaluatePopup(details.url, sourceUrl);
+  if (result?.decision !== 'block' && result?.decision !== 'redirect') return;
+
+  try {
+    await api.tabs.remove(details.tabId);
+    host.stats.recordBlock(details.sourceTabId);
+    updateBadge(details.sourceTabId);
+  } catch {
+    // The target may already have been closed by the browser or the user.
+  }
+}
+
 async function main(): Promise<void> {
   host = await ExtensionHost.start({
     wasmPath: 'core/ratblocker.wasm',
@@ -118,6 +142,9 @@ async function main(): Promise<void> {
 
   api.webNavigation.onCommitted.addListener((details) => {
     void injectCosmetic(details.tabId, details.frameId, details.url);
+  });
+  api.webNavigation.onCreatedNavigationTarget.addListener((details) => {
+    void inspectPopup(details);
   });
 
   api.tabs.onRemoved.addListener((tabId) => host?.stats.clearTab(tabId));

@@ -140,6 +140,9 @@ pub struct RuleOptions {
     /// Bitmask of `ResourceType`s this rule applies to.
     pub resource_mask: u32,
     pub party: PartyConstraint,
+    /// `Some(true)` for `$popup`, `Some(false)` for `$~popup`.
+    #[serde(default)]
+    pub popup: Option<bool>,
     #[serde(default)]
     pub domains: DomainConstraint,
     #[serde(default)]
@@ -164,6 +167,7 @@ impl Default for RuleOptions {
         Self {
             resource_mask: ResourceType::ALL,
             party: PartyConstraint::Any,
+            popup: None,
             domains: DomainConstraint::default(),
             apps: DomainConstraint::default(),
             denyallow: Vec::new(),
@@ -207,6 +211,7 @@ impl NetworkRule {
             && self.regex.is_none()
             && self.options.resource_mask == ResourceType::ALL
             && self.options.party == PartyConstraint::Any
+            && self.options.popup.is_none()
             && self.options.domains.is_empty()
             && self.options.removeparam.is_none()
             && self.options.redirect.is_none()
