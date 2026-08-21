@@ -215,6 +215,34 @@ Two things to know:
   it will not install one. Self-hosted Gecko updates need AMO unlisted signing,
   or a build that does not enforce signing.
 
+### Hosting the downloads
+
+Windows and macOS need somewhere to fetch from, and the repository already
+publishes to GitHub Pages. The Pages workflow builds and packages the
+extensions and puts them under `/downloads/`, so the update URL baked into
+every artefact is:
+
+```
+https://<owner>.github.io/<repo>/downloads/
+```
+
+Add the CRX signing key as a repository secret named `CHROMIUM_SIGNING_KEY`,
+base64-encoded:
+
+```sh
+base64 -w0 chromium-signing-key.pem
+```
+
+The key stays out of the repository, and the extension id is derived from it —
+a different key means a different id, which orphans every existing install.
+Without the secret the workflow still publishes the site and the XPI, and warns
+rather than failing.
+
+For an air-gapped network, point `RATBLOCKER_UPDATE_BASE` at any HTTP server
+that can reach the browsers, including `http://localhost:8080`. Chrome accepts
+plain HTTP for update manifests; Firefox requires HTTPS, but Gecko installs are
+updated by replacing the file in the profile and need no server at all.
+
 ### Chromium and Chrome, off-store, on every platform
 
 This works on Chrome as well as Chromium, and on all three desktop platforms —

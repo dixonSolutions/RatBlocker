@@ -94,3 +94,32 @@ cost of not executing remote code, and it is accepted deliberately.
 detect a rename upstream. The check for that is manual: load a monetized video
 in a fresh profile and confirm the real video starts immediately, rather than a
 15–30 second pre-roll.
+
+
+## How updates actually reach an install
+
+Four cases, and they do not share one mechanism. Where this says *verified*, it
+was tested against the real browser rather than read from documentation.
+
+| Target | Needs a server? | Mechanism |
+| --- | --- | --- |
+| Zen, LibreWolf, Waterfox, Firefox ESR/Dev/Nightly | No | replace `<profile>/extensions/<id>.xpi` — *verified: 0.1.0 to 0.1.1* |
+| Firefox release | No, but needs AMO signing | same, once the XPI is signed |
+| Chromium and Chrome on **Linux** | No | replace the CRX and bump `external_version`; Chrome rescans external descriptors at every start |
+| Chrome and Chromium on **Windows or macOS** | **Yes** | enterprise policy naming an `update_url` |
+
+`extensions/install.mjs` is the update mechanism for the first three: re-running
+it after a version bump is an update. Nothing else is required.
+
+The fourth is different because of a decision Chrome made, not one this project
+made. Local-CRX external installs were removed from Windows in Chrome 33 and
+from macOS in Chrome 44, so there is no local install path there and therefore
+no local update path. Two routes that look like workarounds are not:
+`--load-extension` was removed from branded Chrome in 137 (and the override
+flag in 142), and developer-mode unpacked extensions are switched off again by
+Chrome updates.
+
+That leaves enterprise policy, which names a URL rather than a file. The
+repository's GitHub Pages deployment serves it, so the requirement costs
+nothing; `http://localhost` also works, since Chrome accepts plain HTTP for
+update manifests.

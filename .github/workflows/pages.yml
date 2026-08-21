@@ -9,6 +9,7 @@ on:
       - 'filter-lists/**'
       - 'core/**'
       - 'filter-compiler/**'
+      - 'extensions/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -61,8 +62,46 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: site/package-lock.json
+
+      # The extensions are published alongside the site so that a store-free
+      # install has somewhere to install *from*. This matters most on Windows
+      # and macOS: Chrome refuses off-store external installs there, so policy
+      # is the only route, and policy names a URL rather than a file. Pages is
+      # that URL, over HTTPS, at no cost.
+      - name: Build the WebAssembly engine
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build --release -p ratblocker-wasm --target wasm32-unknown-unknown
+
+      - name: Install extension dependencies
+        working-directory: extensions
+        run: npm ci
+
+      - name: Build and test the extensions
+        working-directory: extensions
+        run: |
+          npm run typecheck
+          npm test
+          node build.mjs
+
+      # Packing a CRX needs the signing key, because the extension id is
+      # derived from it: a different key means a different id, which orphans
+      # every existing install. It lives in a secret rather than the
+      # repository. Without it the site still publishes, just without the
+      # Chromium artefacts, rather than failing the whole deploy.
+      - name: Package the extensions
+        working-directory: extensions
+        env:
+          CHROMIUM_SIGNING_KEY: ${{ secrets.CHROMIUM_SIGNING_KEY }}
+          RATBLOCKER_UPDATE_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/downloads
+        run: |
+          if [ -n "$CHROMIUM_SIGNING_KEY" ]; then
+            printf '%s' "$CHROMIUM_SIGNING_KEY" | base64 -d > ../chromium-signing-key.pem
+            node package.mjs
+          else
+            echo "::warning::CHROMIUM_SIGNING_KEY is not set; publishing the XPI only."
+            node package.mjs firefox
+          fi
 
       - name: Install site dependencies
         working-directory: site
@@ -74,6 +113,27 @@ jobs:
       - name: Build the site
         working-directory: site
         run: npm run build -- --base-href "/${GITHUB_REPOSITORY#*/}/"
+
+      # Everything a browser polls for updates, served from one place.
+      - name: Publish the downloads
+        run: |
+          out=site/dist/site/browser/downloads
+          mkdir -p "$out"
+          for f in dist/ratblocker-chromium.crx dist/chromium-update.xml \
+                   dist/ratblocker-firefox-*.xpi dist/firefox-updates.json \
+                   dist/ATTRIBUTION.txt; do
+            [ -e "$f" ] && cp "$f" "$out/" || true
+          done
+          # The policy artefacts and external-extension descriptors, so an
+          # administrator can fetch exactly what their platform reads.
+          [ -d dist/policy ] && cp -r dist/policy "$out/policy" || true
+          for f in dist/*.json; do
+            case "$(basename "$f")" in
+              metadata.json) ;;
+              *) cp "$f" "$out/" ;;
+            esac
+          done
+          ls -la "$out"
 
       - uses: actions/configure-pages@v5
 
