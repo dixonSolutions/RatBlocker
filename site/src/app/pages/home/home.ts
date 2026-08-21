@@ -39,12 +39,12 @@ export class Home {
       tag: 'Chromium & Firefox',
     },
     {
-      title: 'On the system',
+      title: 'In the player',
       body:
-        'A DNS proxy in front of the resolver, so every application on the machine is covered — ' +
-        'not just the browser. It sees hostnames rather than URLs, which is less information ' +
-        'but far broader reach.',
-      tag: 'Linux daemon',
+        'Ad breaks are pruned out of the video player response before the player reads them, ' +
+        'so streaming ads never start. The pruning is first-party code in the extension, ' +
+        'never executable code arriving from a filter list.',
+      tag: 'Streaming',
     },
   ];
 }

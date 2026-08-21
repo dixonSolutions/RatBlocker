@@ -5,8 +5,6 @@ members = [
     "filter-compiler",
     "tests",
     "extensions/shared/wasm",
-    "linux/daemon",
-    "linux/cli",
 ]
 
 [workspace.package]

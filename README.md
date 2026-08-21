@@ -4,11 +4,16 @@
 
 RatBlocker is an ad and tracker blocker that runs entirely on your own machine.
 It has no account, no cloud service, no telemetry, and it never intercepts TLS:
-filtering happens in a shared Rust engine that is compiled once into a native
-Linux daemon and once into WebAssembly for the browser extensions, so the same
-rules and the same decisions apply everywhere. Filter lists are compiled ahead
-of time into a binary database that ships with the build, which means a fresh
-install blocks from the first request without contacting anything.
+filtering happens in a shared Rust engine compiled to WebAssembly for the
+browser extensions, so the same rules and the same decisions apply everywhere
+it runs. Filter lists are compiled ahead of time into a binary database that
+ships with the build, which means a fresh install blocks from the first request
+without contacting anything.
+
+RatBlocker is a browser extension, for Chromium-based browsers (Chromium,
+Google Chrome) and Gecko-based browsers (Firefox and its forks). It does not
+filter outside the browser on any platform; see [`docs/scope.md`](docs/scope.md)
+for what that covers and why the Linux system daemon was removed.
 
 ## What is here
 
@@ -26,18 +31,11 @@ install blocks from the first request without contacting anything.
   128+) extensions in TypeScript, sharing the popup and settings UI. The engine
   is loaded as WebAssembly through a hand-written ABI in
   `extensions/shared/wasm` (no wasm-bindgen).
-- **`linux/`** — `ratblockerd`, a D-Bus service that owns the engine, plus a
-  caching DNS proxy (including DNS-over-TLS upstreams), a filter updater that
-  verifies ed25519 detached signatures and rolls back to the last known good
-  database, a minimal privileged helper for pointing `systemd-resolved` at the
-  proxy, and `ratblocker`, an unprivileged command-line client. Mutating D-Bus
-  calls are authorised through Polkit.
 - **Popup and internal-link filtering** — browser-created tabs and windows are
   evaluated with their opener and full destination URL, so `$popup` rules can
   match first-party ad paths without blocking ordinary same-tab navigation.
-  Native applications remain DNS-filtered; their UI is outside the safe
-  visibility of a hostname-only proxy. See
-  [`docs/app-filtering.md`](docs/app-filtering.md).
+  See [`docs/app-filtering.md`](docs/app-filtering.md) for what each layer can
+  and cannot see.
 - **`filter-lists/bundled/`** — the EasyList and EasyPrivacy snapshots that the
   compiler consumes.
 - **`tests/`** — security and performance suites, plus Chromium (CDP) and
@@ -52,16 +50,20 @@ Local statistics exist but are off by default, and never record URLs.
 ## Status
 
 Early. The version across the workspace is `0.1.0` and nothing has been
-released. The engine, the compiler, the Linux daemon and both browser
-extensions are implemented and covered by tests, but the project has rough
-edges you should know about before relying on it:
+released. The engine, the compiler and both browser extensions are implemented
+and covered by tests, but the project has rough edges you should know about
+before relying on it:
 
 - The comprehensive `docs/architecture.md` cited by source comments has not
   been reconstructed yet; focused platform behavior is documented in `docs/`.
-- Android and GNOME frontends are described in the architecture but no such
-  code exists in this repository yet.
-- The GTK settings application does not exist yet; the daemon is driven by the
-  `ratblocker` command-line client.
+- **Android is not implemented.** A system-wide Android service is the next
+  planned platform; no such code exists in this repository yet.
+- **There is no system-wide filtering on desktop.** Filtering applies inside
+  supported browsers only. Native desktop applications are not covered.
+- YouTube in-video ads are handled by pruning ad decisions out of the player
+  response in the extension (`extensions/shared/src/streaming-ads.ts`). This is
+  inherently a moving target: when YouTube renames those fields it stops
+  working until the extension is updated.
 - Distribution URLs in the packaging artifacts are placeholders. Override them
   with `RATBLOCKER_UPDATE_BASE` when packaging.
 - Filter-update signing is implemented (ed25519, detached) but no signing key
@@ -72,7 +74,7 @@ edges you should know about before relying on it:
 Requires Rust 1.82 or newer and a recent Node.js (the build scripts are ESM and
 use `import.meta.dirname`, so Node 20.11+).
 
-Build the Rust workspace — engine, filter compiler, daemon and CLI:
+Build the Rust workspace — the engine and the filter compiler:
 
 ```sh
 cargo build --release
@@ -108,27 +110,6 @@ Either directory can be loaded as an unpacked extension for development.
 
 ## Installing
 
-### Linux daemon
-
-```sh
-sudo bash linux/packaging/install.sh
-sudo systemctl enable --now ratblockerd
-ratblocker status
-```
-
-The daemon runs under its own unprivileged account with
-`CAP_NET_BIND_SERVICE` and nothing else, and answers DNS on `127.0.0.2:53`.
-Installing it does **not** redirect the system's DNS; that is a separate unit,
-so the change only happens when you ask for it and stopping the unit puts your
-resolver configuration back:
-
-```sh
-sudo systemctl enable --now ratblocker-dns
-```
-
-`sudo bash linux/packaging/uninstall.sh` reverses everything and restores DNS
-first. Configuration and state are left behind deliberately.
-
 ### Browsers, without a store
 
 ```sh
@@ -143,12 +124,20 @@ Installing without the Web Store:
 
 ```sh
 sudo install -Dm644 dist/ratblocker-chromium.crx /usr/share/ratblocker/ratblocker-chromium.crx
+
+# Chromium
 sudo install -Dm644 dist/<extension-id>.json /usr/share/chromium/extensions/
+
+# Google Chrome reads the same descriptor from its own directory
+sudo install -Dm644 dist/<extension-id>.json /opt/google/chrome/extensions/
 ```
+
+The same CRX and descriptor serve both browsers; only the directory differs.
 
 For genuinely remote hosting, publish `ratblocker-chromium.crx` and
 `chromium-update.xml` and deploy `dist/chromium-policy.json` to
-`/etc/chromium/policies/managed/`.
+`/etc/chromium/policies/managed/` (Chromium) or
+`/etc/opt/chrome/policies/managed/` (Google Chrome).
 
 For **Firefox**, this produces an XPI. Release Firefox refuses to permanently
 install an unsigned extension and no preference or policy overrides that, so
@@ -177,8 +166,8 @@ and EasyPrivacy are published by the EasyList project under
 Every build records provenance for the lists it compiled in
 `dist/ATTRIBUTION.txt` — the name, version, upstream source, home page,
 licence and rule count of each list. That file is copied into each extension
-build and installed alongside the daemon, so a shipped artifact always carries
-the attribution for the data inside it.
+build, so a shipped artifact always carries the attribution for the data
+inside it.
 
 `core/data/public_suffix_list.txt` is the Mozilla Public Suffix List, used
 under **MPL-2.0**; its licence is kept next to it in
