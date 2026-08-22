@@ -13,6 +13,24 @@ export const PROJECT = {
   license: 'GPL-3.0-or-later',
   chromiumExtensionId: 'mkkpcbjiinhopbipddkpjjaeffjmfnnb',
   firefoxExtensionId: 'ratblocker@ratblocker.github.io',
+
+  /**
+   * The add-on's home on addons.mozilla.org.
+   *
+   * `amoListed` is what the install button keys off, and it is false until a
+   * listed submission has actually been accepted — the publish workflow flips
+   * it when AMO returns a slug. Showing a button that leads to a 404 is worse
+   * than showing no button, so until then the site offers the build-it-
+   * yourself route only.
+   */
+  amoSlug: 'ratblocker',
+  amoListed: false,
+} as const;
+
+/** Where a published add-on lives, derived from the slug AMO assigned. */
+export const AMO = {
+  listingUrl: `https://addons.mozilla.org/firefox/addon/${PROJECT.amoSlug}/`,
+  latestXpiUrl: `https://addons.mozilla.org/firefox/downloads/latest/${PROJECT.amoSlug}/latest.xpi`,
 } as const;
 
 export interface Promise_ {

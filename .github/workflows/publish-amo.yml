@@ -1,0 +1,137 @@
+name: Publish to addons.mozilla.org
+
+# Publishing is deliberate, not automatic. A listed submission enters Mozilla's
+# review queue and is visible to the public, so it is triggered by cutting a
+# release or by asking for it by hand — never by an ordinary push.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'listed puts it in the public AMO catalogue; unlisted signs it for self-hosting'
+        type: choice
+        options: [listed, unlisted]
+        default: listed
+        required: true
+      dry_run:
+        description: 'Build and validate without submitting anything'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-amo
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The same build the site publishes, so what is submitted to Mozilla and
+      # what is offered for a store-free install are the same artefact.
+      - name: Build the filter database
+        run: |
+          cargo build --release -p ratblocker-filter-compiler
+          ./target/release/ratblocker-compile build \
+            --list easylist=filter-lists/bundled/easylist.txt \
+            --list easyprivacy=filter-lists/bundled/easyprivacy.txt \
+            --out dist
+
+      - name: Build the WebAssembly engine
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build --release -p ratblocker-wasm --target wasm32-unknown-unknown
+
+      - name: Build and package the extension
+        working-directory: extensions
+        env:
+          RATBLOCKER_UPDATE_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/downloads
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          node build.mjs firefox
+          node package.mjs firefox
+
+      # A submission cannot be taken back, so the artefact is checked before
+      # anything leaves the runner.
+      - name: Check what would be submitted
+        working-directory: extensions
+        run: |
+          xpi=$(ls ../dist/ratblocker-firefox-*.xpi | tail -1)
+          echo "would submit: $xpi ($(du -h "$xpi" | cut -f1))"
+          node -e "
+            const m = require('./firefox/build/manifest.json');
+            console.log('id      ', m.browser_specific_settings.gecko.id);
+            console.log('version ', m.version);
+          "
+
+      - name: Submit to AMO
+        if: ${{ inputs.dry_run != true }}
+        working-directory: extensions
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then
+            echo "::error::AMO_JWT_ISSUER and AMO_JWT_SECRET are not set."
+            echo "Generate a key at https://addons.mozilla.org/developers/addon/api/key/"
+            echo "then: gh secret set AMO_JWT_ISSUER; gh secret set AMO_JWT_SECRET"
+            exit 1
+          fi
+          node sign-firefox.mjs --channel "${{ inputs.channel || 'listed' }}"
+
+      # The listing address the site's install button points at. Committed back
+      # so the site links to the real add-on rather than to a URL someone typed
+      # into a template and hoped was right.
+      - name: Record the listing
+        if: ${{ inputs.dry_run != true && (inputs.channel || 'listed') == 'listed' }}
+        run: |
+          [ -f dist/amo-listing.json ] || exit 0
+          slug=$(node -p "require('./dist/amo-listing.json').slug")
+          url=$(node -p "require('./dist/amo-listing.json').listingUrl")
+          node -e "
+            const fs = require('node:fs');
+            const path = 'site/src/app/data/project.ts';
+            const before = fs.readFileSync(path, 'utf8');
+            const after = before
+              .replace(/amoSlug: '[^']*'/, \"amoSlug: '$slug'\")
+              .replace(/amoListed: (true|false)/, 'amoListed: true');
+            if (after !== before) fs.writeFileSync(path, after);
+          "
+          if ! git diff --quiet site/src/app/data/project.ts; then
+            git config user.name 'github-actions[bot]'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add site/src/app/data/project.ts
+            git commit -m "Point the install button at the published AMO listing"
+            git push
+          fi
+          echo "listing: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firefox-xpi
+          path: |
+            dist/ratblocker-firefox-*.xpi
+            dist/amo-listing.json
+          if-no-files-found: warn

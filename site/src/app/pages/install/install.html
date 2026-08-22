@@ -10,6 +10,42 @@
     covered by tests, but treat it as early software.
   </p-message>
 
+  @if (project.amoListed) {
+    <h2>Get it from Mozilla</h2>
+    <p>
+      RatBlocker is in the Firefox add-on catalogue. Mozilla signs it, hosts it and delivers its
+      updates, which is the shortest route on any Firefox-based browser and the only one that
+      needs no build and no terminal.
+    </p>
+    <p>
+      <a [href]="amo.listingUrl" rel="noopener">
+        <p-button label="Get it as a Mozilla Add-on" size="large" icon="pi pi-download" />
+      </a>
+    </p>
+    <p class="muted">
+      Chromium and Chrome are not in a store at all, deliberately. Their install is below.
+    </p>
+  } @else {
+    <p-message severity="info" [closable]="false">
+      The Firefox add-on is not in Mozilla's catalogue yet. Until it is, install it from a build,
+      as below — the guided setup finds your browsers and does the rest.
+    </p-message>
+  }
+
+  <h2>Guided setup</h2>
+  <p>
+    The shortest route on any operating system. It finds the browsers installed on the machine,
+    identifies each one by the engine it ships rather than by its name, and asks which to install
+    into. Bash for Linux and macOS, PowerShell for Windows; neither needs anything else installed.
+  </p>
+  <pre><code>cd extensions
+./setup.sh              # Linux, macOS
+.\setup.ps1             # Windows</code></pre>
+  <p>
+    Pass <code>--dry-run</code> to see the plan without changing anything, <code>--update</code> to
+    refresh only what is older, and <code>--uninstall</code> to reverse it.
+  </p>
+
   <h2>Build it first</h2>
   <p>
     Every install path starts from a build. You need Rust 1.82 or newer and Node 20.11 or newer.

@@ -1,11 +1,21 @@
 /**
- * Submit the Firefox XPI to addons.mozilla.org for *unlisted* signing, then
- * download the signed result and write the update manifest for self-hosting.
+ * Submit the Firefox XPI to addons.mozilla.org, in either channel.
+ *
+ *   node sign-firefox.mjs                    unlisted (the default)
+ *   node sign-firefox.mjs --channel listed   the public AMO catalogue
  *
  * Why this exists: release Firefox refuses to permanently install an unsigned
- * extension. Unlisted signing is the route that keeps distribution in your
- * hands — Mozilla signs the file, you host it and its updates yourself, there
- * is no review queue and nothing appears in the public directory.
+ * extension, and the two channels answer that differently.
+ *
+ * *Unlisted* keeps distribution in your hands — Mozilla signs the file, you
+ * host it and its updates yourself, there is no review queue and nothing
+ * appears in the public directory. The signed XPI is downloaded here.
+ *
+ * *Listed* puts the add-on in the public catalogue, which is what gives it an
+ * addons.mozilla.org page, a one-click install button, and updates served by
+ * Mozilla. It goes through a review queue, so there is no signed file to
+ * collect at the end of this script; what it writes instead is
+ * `dist/amo-listing.json`, the listing address the site links to.
  *
  * Credentials come from the environment or from `.amo-credentials` (which is
  * gitignored):
@@ -27,6 +37,31 @@ const repo = resolve(here, '..');
 const dist = join(repo, 'dist');
 
 const API = 'https://addons.mozilla.org/api/v5';
+const SITE = 'https://addons.mozilla.org';
+
+const args = process.argv.slice(2);
+const channelFlag = args.indexOf('--channel');
+const CHANNEL = channelFlag >= 0 ? args[channelFlag + 1] : 'unlisted';
+if (CHANNEL !== 'listed' && CHANNEL !== 'unlisted') {
+  throw new Error(`--channel must be "listed" or "unlisted", not "${CHANNEL}"`);
+}
+
+/**
+ * The listing metadata AMO requires before it will accept a public submission.
+ * Only sent when the add-on is created; afterwards the listing is edited on
+ * AMO itself, and this script must not quietly overwrite what is there.
+ */
+const LISTING = {
+  slug: 'ratblocker',
+  name: { 'en-US': 'RatBlocker' },
+  summary: {
+    'en-US':
+      'Local, private ad and tracker blocking. Filtering happens on your machine: '
+      + 'no account, no cloud service, no telemetry, and no TLS interception.',
+  },
+  categories: ['privacy-security'],
+  license: 'GPL-3.0-or-later',
+};
 const DOWNLOAD_BASE =
   process.env.RATBLOCKER_UPDATE_BASE ?? 'https://ratblocker.example/downloads';
 
@@ -106,12 +141,12 @@ async function main() {
   const guid = manifest.browser_specific_settings.gecko.id;
   const { version } = manifest;
 
-  console.log(`signing ${basename(xpi)} as ${guid} ${version} (unlisted)`);
+  console.log(`signing ${basename(xpi)} as ${guid} ${version} (${CHANNEL})`);
 
   // 1. Upload.
   const form = new FormData();
   form.append('upload', new Blob([await readFile(xpi)]), basename(xpi));
-  form.append('channel', 'unlisted');
+  form.append('channel', CHANNEL);
   const upload = await call('/addons/upload/', { method: 'POST', body: form }, creds);
   console.log(`  upload ${upload.uuid}`);
 
@@ -134,6 +169,7 @@ async function main() {
 
   // 3. Create the version. The add-on may or may not exist yet.
   let versionRecord;
+  let created;
   try {
     versionRecord = await call(
       `/addons/addon/${encodeURIComponent(guid)}/versions/`,
@@ -147,16 +183,44 @@ async function main() {
   } catch (error) {
     if (!/404/.test(String(error))) throw error;
     console.log('  add-on not registered yet; creating it');
-    versionRecord = await call(
+    created = await call(
       '/addons/addon/',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ upload: upload.uuid }),
+        body: JSON.stringify(
+          CHANNEL === 'listed'
+            ? { upload: upload.uuid, ...LISTING }
+            : { upload: upload.uuid },
+        ),
       },
       creds,
     );
-    versionRecord = versionRecord.version ?? versionRecord;
+    versionRecord = created.version ?? created;
+  }
+
+  if (CHANNEL === 'listed') {
+    // A listed version goes into a review queue, so there is no signed file to
+    // wait for here. What matters to everything downstream is the address the
+    // add-on now lives at, which is what the site's install button points to.
+    const addon = created ?? await call(`/addons/addon/${encodeURIComponent(guid)}/`, {}, creds);
+    const slug = addon.slug ?? LISTING.slug;
+    const listing = {
+      guid,
+      version,
+      channel: 'listed',
+      slug,
+      listingUrl: `${SITE}/firefox/addon/${slug}/`,
+      latestXpiUrl: `${SITE}/firefox/downloads/latest/${slug}/latest.xpi`,
+      submittedAt: new Date().toISOString(),
+    };
+    await writeFile(join(dist, 'amo-listing.json'), `${JSON.stringify(listing, null, 2)}\n`);
+    console.log(`  listing -> ${listing.listingUrl}`);
+    console.log('  written to dist/amo-listing.json');
+    console.log('\nThe version is queued for review. Once it is approved, the listing');
+    console.log('page and the install button on the site both work, and Firefox');
+    console.log('updates every install from Mozilla with nothing to host.');
+    return;
   }
 
   // 4. Wait for the signed file.

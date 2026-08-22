@@ -110,9 +110,86 @@ Either directory can be loaded as an unpacked extension for development.
 
 ## Installing
 
+### Guided setup
+
+The shortest route on any operating system. Bash for Linux and macOS,
+PowerShell for Windows; neither needs anything else installed:
+
+```sh
+cd extensions
+./setup.sh                 # Linux, macOS
+```
+
+```powershell
+cd extensions
+.\setup.ps1                # Windows
+```
+
+It lists what it found and waits for a selection:
+
+```
+Found:
+
+  1 ✓ Zen 1.21.15b                   gecko     flatpak
+        app.zen_browser.zen
+        2 profiles
+  2 ✗ Firefox 153.0.4                gecko     system
+        a Mozilla release build enforces signing and would reject an unsigned XPI
+  3 ! Chromium 151.0.7922.108        chromium  system
+        /usr/share/chromium/extensions
+
+Select browsers: numbers (1 3), a range (1-3), "a" for all, "q" to quit.
+```
+
+Nothing is touched without being chosen. `--dry-run` shows the plan and changes
+nothing, `--update` installs only where what is there is older, `--uninstall`
+reverses it, `--list` and `--json` just report, and `--all --yes` skips the
+questions. `--xpi <path|url>` installs a particular build — a signed one from
+Mozilla, for instance, rather than a local one.
+
+**Nothing in that list is hardcoded, and no browser is named anywhere in either
+script.** Browsers are found by asking the machine what is installed, and each
+one is identified by the engine it actually ships — `libxul.so` or `xul.dll`
+for Gecko, `resources.pak` beside `icudtl.dat` for Chromium — so a fork
+released after this was written is found on its own terms. Everything else is
+read out of the installation too:
+
+- the name and version from `application.ini`, or from the desktop entry that
+  claims to handle `http`, or from the package manager that owns the file;
+- the profile directory derived the way Gecko itself derives it, from
+  `[App] Profile` or `Vendor`/`Name`, and then confirmed against the
+  `compatibility.ini` Gecko leaves in every profile naming the installation it
+  last ran from — which is how a profile that has moved is still matched to its
+  browser, and how a profile whose browser is gone is still recognised;
+- a Chromium build's external-extension directory out of the strings in its own
+  binary, where the compiler left it.
+
+Flatpak and snap are asked directly what they have and where they put it, and
+the sandboxed home each one hands the browser is scanned separately — a flatpak
+is a different browser from a native install of the same name, because its
+profiles are somewhere the native install will never look.
+
+Two rules hold throughout both scripts, and both matter:
+
+- **Nothing found is ever executed.** Asking a binary its version is how you
+  open half a dozen windows on someone's desktop, because plenty of things that
+  embed a browser engine are not browsers. Versions come from files and from
+  the package manager.
+- **Embedding an engine is not being a browser.** Every Electron application
+  ships Chromium's `.pak` files and Thunderbird ships the same libxul. Both are
+  recognised — an application carries its own code in `resources/app.asar`, and
+  a Gecko browser ships `browser/omni.ja` where a mail client does not — and
+  both are reported as skipped rather than silently offered or silently
+  dropped.
+
+`extensions/tests/setup-script.test.mjs` holds the two scripts to one
+specification, building synthetic browsers in a temporary directory and running
+the real scripts against them. It runs on Linux, macOS and Windows in CI, so
+the two implementations cannot drift apart unnoticed.
+
 ### Browsers, without a store
 
-Build and package first, then install:
+To drive it from a script, or to package for distribution, build first:
 
 ```sh
 cd extensions && node build.mjs
@@ -175,23 +252,57 @@ was off. Release Firefox enforces it and rejects the XPI outright, so
 Zen, LibreWolf, Waterfox, Developer Edition, Nightly, ESR and Mozilla's
 unbranded builds accept it.
 
-Flatpak installs are treated as separate browsers, because they are: a flatpak
-keeps its profiles under `~/.var/app/`, and installing there would not affect a
-native install of the same browser.
+Flatpak and snap installs are treated as separate browsers, because they are: a
+sandboxed package keeps its profiles under `~/.var/app/` or `~/snap/`, and
+installing there would not affect a native install of the same browser.
 
-To check a build this table does not cover, ask it directly:
+The setup scripts work this out per build instead of consulting a table: a
+default preference that turns the check off settles it, then the update channel
+the build ships, then who built it. To settle it by experiment rather than by
+inference — the only way to be certain — ask the build directly:
 
 ```sh
 node tests/browser/gecko-signing.mjs <browser-binary> dist/ratblocker-firefox-0.1.0.xpi
 ```
 
-For release Firefox there are two routes:
+For release Firefox there are three routes:
 
-- `node sign-firefox.mjs` submits the XPI to addons.mozilla.org for *unlisted*
-  signing — no review queue, nothing listed publicly, and you host the signed
-  file and its updates yourself. It needs an AMO API key. Once signed,
-  `install.mjs` installs it like any other.
+- **Listed.** `node sign-firefox.mjs --channel listed` submits the XPI to the
+  public Firefox add-on catalogue. Mozilla signs it, hosts it, serves its
+  updates, and gives it a page with an install button — which is what the *Get
+  it as a Mozilla Add-on* button on the site links to. It goes through a review
+  queue, and the listing is public.
+- **Unlisted.** `node sign-firefox.mjs` submits it for unlisted signing — no
+  review queue, nothing public, and you host the signed file and its updates
+  yourself. Once signed, both setup scripts and `install.mjs` install it like
+  any other.
 - Use a build that does not enforce signing, from the list above.
+
+Both need an AMO API key. Generate one at
+<https://addons.mozilla.org/developers/addon/api/key/>, then put it where the
+workflow can reach it:
+
+```sh
+gh secret set AMO_JWT_ISSUER
+gh secret set AMO_JWT_SECRET
+```
+
+Locally, the same two values go in the environment or in `.amo-credentials`,
+which is gitignored. Never commit them, and treat a key that has been pasted
+anywhere as spent — revoke and regenerate it on the same page.
+
+### Publishing
+
+`.github/workflows/publish-amo.yml` builds the extension, validates it, and
+submits it. It runs when a GitHub release is published, or on demand from the
+Actions tab, where the channel is a dropdown and `dry_run` builds and validates
+without submitting anything. Publishing is never triggered by an ordinary push:
+a listed submission is public and cannot be taken back.
+
+Once a listed submission is accepted, the workflow records the slug AMO
+assigned into `site/src/app/data/project.ts`, which is what turns the install
+button on. Until then the site says the add-on is not in the catalogue yet
+rather than offering a button that leads nowhere.
 
 ## Staying up to date
 
