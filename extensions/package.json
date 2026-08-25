@@ -1,6 +1,6 @@
 {
   "name": "ratblocker-extensions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "RatBlocker browser extensions for Chromium and Firefox.",
   "license": "GPL-3.0-or-later",
