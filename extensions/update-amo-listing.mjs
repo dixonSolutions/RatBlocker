@@ -65,19 +65,10 @@ async function uploadIcon(id, creds) {
   console.log('  icon uploaded', result.icon_url ?? '(pending async resize)');
 }
 
-/** Replace the banner preview so re-runs do not stack up duplicates: delete
- * every existing preview, then upload the current one at position 1. */
+/** Replace the banner preview so re-runs do not stack up duplicates. Upload the
+ * new preview first (so the listing always has a hero image), then best-effort delete
+ * every old preview — a 429 throttle on delete must not fail the step. */
 async function replacePreview(id, creds) {
-  const addon = await call(`/addons/addon/${encodeURIComponent(id)}/`, {}, creds);
-  for (const p of addon.previews ?? []) {
-    await call(
-      `/addons/addon/${encodeURIComponent(id)}/previews/${p.id}/`,
-      { method: 'DELETE' },
-      creds,
-    );
-    console.log(`  deleted old preview ${p.id}`);
-  }
-
   const form = new FormData();
   form.append('image', new Blob([await readFile(preview)]), 'preview.png');
   form.append('position', '1');
@@ -88,6 +79,21 @@ async function replacePreview(id, creds) {
   );
   console.log('  uploaded preview', result.id);
   console.log(`  ${result.image_url ?? '(image url pending async resize)'}`);
+
+  const addon = await call(`/addons/addon/${encodeURIComponent(id)}/`, {}, creds);
+  for (const p of addon.previews ?? []) {
+    if (p.id === result.id) continue;
+    try {
+      await call(
+        `/addons/addon/${encodeURIComponent(id)}/previews/${p.id}/`,
+        { method: 'DELETE' },
+        creds,
+      );
+      console.log(`  deleted old preview ${p.id}`);
+    } catch (e) {
+      console.log(`  could not delete old preview ${p.id} (${e.message}); remove it on AMO if needed`);
+    }
+  }
 }
 
 async function main() {
