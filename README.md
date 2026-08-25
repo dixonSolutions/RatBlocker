@@ -38,6 +38,10 @@ install blocks from the first request without contacting anything.
   Native applications remain DNS-filtered; their UI is outside the safe
   visibility of a hostname-only proxy. See
   [`docs/app-filtering.md`](docs/app-filtering.md).
+- **VPNs** — the daemon forwards to the machine's own resolvers by default and
+  follows them as they change, so connecting a VPN moves filtered queries into
+  the tunnel instead of stranding them on the previous network's resolver. See
+  [`docs/vpn.md`](docs/vpn.md).
 - **`filter-lists/bundled/`** — the EasyList and EasyPrivacy snapshots that the
   compiler consumes.
 - **`tests/`** — security and performance suites, plus Chromium (CDP) and

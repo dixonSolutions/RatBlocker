@@ -170,7 +170,15 @@ fn print_status(status: &Value) {
     }
     if let Some(upstreams) = status["upstreams"].as_array() {
         let list: Vec<&str> = upstreams.iter().filter_map(Value::as_str).collect();
-        println!("Upstream     {}", list.join(", "));
+        // Say where these came from: one is a standing choice, the other moves
+        // with the network, and which it is decides what to check when DNS
+        // stops working after connecting a VPN.
+        let origin = if status["upstreams_follow_system"].as_bool().unwrap_or(false) {
+            "following the machine's own resolvers"
+        } else {
+            "configured"
+        };
+        println!("Upstream     {} ({origin})", list.join(", "));
     }
     let dns = &status["dns"];
     println!(

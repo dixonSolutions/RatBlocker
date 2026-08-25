@@ -347,6 +347,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Once;
 
@@ -396,13 +397,13 @@ mod tests {
         Upstream::Plain { address: address.parse().unwrap() }
     }
 
-    fn resolver(configured: Vec<Upstream>, resolv: &PathBuf) -> Resolver {
+    fn resolver(configured: Vec<Upstream>, resolv: &Path) -> Resolver {
         crypto_provider();
         Resolver::build(
             configured,
             Duration::from_secs(1),
             &listen(),
-            vec![resolv.clone()],
+            vec![resolv.to_path_buf()],
         )
         .expect("building the resolver")
     }

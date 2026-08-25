@@ -147,7 +147,11 @@ impl Service {
             "dns_enforceable_rules": engine.dns_enforceable_count(),
             "core_version": ratblocker_core::CORE_VERSION,
             "daemon_version": env!("CARGO_PKG_VERSION"),
+            // The upstreams actually in use right now, not the ones configured:
+            // a `system` entry follows the machine, so this is the first thing
+            // worth seeing when DNS stops working after a network change.
             "upstreams": self.state.resolver.describe(),
+            "upstreams_follow_system": self.state.resolver.follows_system(),
             "listen": self.updater.settings().listen.iter().map(ToString::to_string).collect::<Vec<_>>(),
             "dns": {
                 "queries": counters.queries.load(Relaxed),

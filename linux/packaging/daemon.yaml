@@ -19,6 +19,12 @@ listen:
 # /run/systemd/resolve/resolv.conf. That matters on networks that only permit
 # their own DNS server, and it is what keeps internal names resolving. The
 # public resolvers below are a fallback for when no system resolver is found.
+#
+# `system` is re-read as the machine's resolvers change, so connecting a VPN
+# moves queries into the tunnel rather than leaving them pointed at the
+# previous network. Replacing it with a fixed server below opts out of that:
+# queries then keep going to that server whatever network you are on. See
+# docs/vpn.md.
 upstream:
   - protocol: system
   - protocol: plain
