@@ -2,6 +2,7 @@
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -153,6 +154,12 @@ pub struct Resolver {
     /// Files consulted for a `system` upstream. A field rather than the
     /// constant so the refresh path can be tested without writing to `/run`.
     resolv_paths: Vec<PathBuf>,
+    /// Whether the last refresh already reported that nothing could be read.
+    /// Being unable to read the machine's resolvers is a state, not an event,
+    /// and a host that simply has none — served by the configured fallbacks —
+    /// stays in it: without this the poll would repeat the same warning every
+    /// couple of seconds for a working configuration.
+    reported_empty: AtomicBool,
     timeout: Duration,
     tls: Arc<ClientConfig>,
 }
@@ -189,6 +196,7 @@ impl Resolver {
             active: RwLock::new(Arc::new(active)),
             own: own.to_vec(),
             resolv_paths,
+            reported_empty: AtomicBool::new(false),
             timeout,
             tls: Arc::new(tls),
         })
@@ -239,9 +247,16 @@ impl Resolver {
             // hold none, or to drop to the fallbacks: the machine may simply be
             // between networks, the old set may yet come back, and a public
             // resolver would take names outside a tunnel that is still up.
-            tracing::warn!("no usable resolver found while refreshing; keeping the current set");
+            //
+            // Once per spell without them: the poll and every failed query come
+            // through here, so saying it each time would bury the moment they
+            // went away under a line every couple of seconds.
+            if !self.reported_empty.swap(true, Ordering::Relaxed) {
+                tracing::warn!("no usable resolver found while refreshing; keeping the current set");
+            }
             return false;
         }
+        self.reported_empty.store(false, Ordering::Relaxed);
         let candidate = expand(&self.configured, &system);
 
         let mut guard = self.active.write().unwrap_or_else(|e| e.into_inner());
