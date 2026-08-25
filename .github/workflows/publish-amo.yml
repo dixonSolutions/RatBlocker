@@ -71,9 +71,8 @@ jobs:
       - name: Bump version
         if: ${{ inputs.dry_run != true && (github.event_name == 'push' || inputs.skip_bump != true) }}
         id: bump
-        working-directory: extensions
         run: |
-          next=$(node bump-version.mjs | tail -1 | awk '{print $2}')
+          next=$(node extensions/bump-version.mjs | tail -1 | awk '{print $2}')
           echo "version=$next" >> "$GITHUB_OUTPUT"
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'

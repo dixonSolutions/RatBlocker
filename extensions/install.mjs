@@ -172,7 +172,10 @@ function flatpakInstalled(appId) {
 }
 
 function onPath(candidate) {
-  if (candidate.includes('/')) return existsSync(candidate) ? candidate : null;
+  // Either separator: the Windows entries are spelled with backslashes, and
+  // sending one of those to `which` — a command Windows does not have — would
+  // report every browser on the machine as missing.
+  if (/[\\/]/.test(candidate)) return existsSync(candidate) ? candidate : null;
   try {
     return execFileSync('which', [candidate], { encoding: 'utf8' }).trim() || null;
   } catch {
