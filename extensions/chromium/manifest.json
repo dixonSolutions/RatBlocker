@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RatBlocker",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local, privacy-preserving ad and tracker filtering. No account, no cloud, no HTTPS interception.",
   "minimum_chrome_version": "121",
   "icons": {
