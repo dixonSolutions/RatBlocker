@@ -70,9 +70,12 @@ const LISTING = {
   categories: { firefox: ['privacy-security'], android: ['privacy-security'] },
 };
 // License belongs to the version, not the add-on, so it travels inside the
-// `version` object when the add-on is created.
+// `version` object when the add-on is created. AMO exposes GPLv3 only as the
+// `GPL-3.0-only` builtin slug (it has no `GPL-3.0-or-later`); uBlock Origin and
+// other GPL-3.0-or-later add-ons use the same slug on AMO. The repo's LICENSE
+// remains the authoritative "or-later" terms.
 const VERSION_META = {
-  license: 'GPL-3.0-or-later',
+  license: 'GPL-3.0-only',
 };
 const DOWNLOAD_BASE =
   process.env.RATBLOCKER_UPDATE_BASE ?? 'https://ratblocker.example/downloads';
