@@ -53,13 +53,13 @@ async function main() {
   const form = new FormData();
   form.append('image', new Blob([await readFile(preview)]), 'preview.png');
   form.append('position', '1');
-  const preview = await call(
+  const result = await call(
     `/addons/addon/${encodeURIComponent(id)}/previews/`,
     { method: 'POST', body: form },
     creds,
   );
-  console.log('  uploaded preview', preview.id);
-  console.log(`  ${preview.image_url ?? '(image url pending async resize)'}`);
+  console.log('  uploaded preview', result.id);
+  console.log(`  ${result.image_url ?? '(image url pending async resize)'}`);
 }
 
 await main();
