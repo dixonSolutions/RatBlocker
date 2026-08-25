@@ -112,13 +112,15 @@ fn system_upstreams_from(paths: &[PathBuf], own: &[SocketAddr]) -> Vec<Upstream>
     Vec::new()
 }
 
-/// Expand `system` entries into the machine's current resolvers, keeping the
-/// configured order so a static entry after `system` still acts as a fallback.
-fn expand(configured: &[Upstream], own: &[SocketAddr], resolv_paths: &[PathBuf]) -> Vec<Upstream> {
+/// Expand `system` entries into the machine's resolvers, keeping the configured
+/// order so a static entry after `system` still acts as a fallback. They are
+/// read by the caller: whether the machine has any is a different question from
+/// whether the expansion is empty, and `refresh` turns on the first.
+fn expand(configured: &[Upstream], system: &[Upstream]) -> Vec<Upstream> {
     let mut expanded = Vec::with_capacity(configured.len());
     for upstream in configured {
         match upstream {
-            Upstream::System => expanded.extend(system_upstreams_from(resolv_paths, own)),
+            Upstream::System => expanded.extend(system.iter().cloned()),
             other => expanded.push(other.clone()),
         }
     }
@@ -171,7 +173,7 @@ impl Resolver {
         if upstreams.is_empty() {
             bail!("at least one upstream resolver is required");
         }
-        let active = expand(&upstreams, own, &resolv_paths);
+        let active = expand(&upstreams, &system_upstreams_from(&resolv_paths, own));
         if active.is_empty() {
             bail!("no usable upstream resolver: `system` found none and no fallback is configured");
         }
@@ -198,7 +200,15 @@ impl Resolver {
         self.follows_system
     }
 
-    fn active(&self) -> Arc<Vec<Upstream>> {
+    /// The set of upstreams in use right now.
+    ///
+    /// Kept by the caller across a query and compared with `Arc::ptr_eq`
+    /// against a later reading, it answers the only question a finished query
+    /// has: is the set it went to still the set in use, or did the network move
+    /// underneath it? A new set is always a new allocation, so the comparison
+    /// holds however the swap happened — this query's own refresh, the poll, or
+    /// another query that failed alongside it.
+    pub fn active(&self) -> Arc<Vec<Upstream>> {
         self.active
             .read()
             .unwrap_or_else(|e| e.into_inner())
@@ -219,14 +229,20 @@ impl Resolver {
         if !self.follows_system {
             return false;
         }
-        let candidate = expand(&self.configured, &self.own, &self.resolv_paths);
-        if candidate.is_empty() {
+        // What decides this is whether the machine has resolvers of its own,
+        // not whether the expansion is empty: with fallbacks configured behind
+        // `system` — as the shipped defaults have — it never is, and an
+        // unreadable resolv.conf would read as a move to the public resolvers.
+        let system = system_upstreams_from(&self.resolv_paths, &self.own);
+        if system.is_empty() {
             // Better to keep querying resolvers that may have gone away than to
-            // hold no upstream at all: the machine may simply be between
-            // networks, and the old set may yet come back.
+            // hold none, or to drop to the fallbacks: the machine may simply be
+            // between networks, the old set may yet come back, and a public
+            // resolver would take names outside a tunnel that is still up.
             tracing::warn!("no usable resolver found while refreshing; keeping the current set");
             return false;
         }
+        let candidate = expand(&self.configured, &system);
 
         let mut guard = self.active.write().unwrap_or_else(|e| e.into_inner());
         if **guard == candidate {
@@ -244,13 +260,16 @@ impl Resolver {
         self.active().iter().map(Upstream::describe).collect()
     }
 
-    /// Forward a query, trying each active upstream until one answers.
+    /// Forward a query, trying each of `upstreams` until one answers.
     ///
     /// One pass, and no refresh: recovering from a network change also has to
     /// drop the cache, so that decision belongs to the caller that owns both.
-    pub async fn resolve(&self, request: &[u8]) -> Result<Vec<u8>> {
+    /// The set is passed in for the same reason — the caller holds the handle
+    /// `active` gave it, and so can still tell, once the query is over, which
+    /// set the answer or the failure came from.
+    pub async fn resolve(&self, upstreams: &[Upstream], request: &[u8]) -> Result<Vec<u8>> {
         let mut last: Option<anyhow::Error> = None;
-        for upstream in self.active().iter() {
+        for upstream in upstreams {
             let attempt = match upstream {
                 // `expand` removes these; nothing to do at query time.
                 Upstream::System => continue,
@@ -475,6 +494,26 @@ mod tests {
         assert_eq!(resolver.describe(), vec!["udp://192.168.1.1:53"]);
     }
 
+    /// The same rule under the shipped defaults, where public resolvers sit
+    /// behind `system`. Those are there for a machine whose resolvers cannot be
+    /// read at all, not for the gap between two networks: dropping to them
+    /// there discards the resolvers the machine is about to have back, flushes
+    /// the cache, and sends names to a public resolver outside whatever tunnel
+    /// is still up.
+    #[test]
+    fn configured_fallbacks_do_not_displace_the_last_known_resolvers() {
+        let dir = TempDir::new();
+        let path = dir.resolv_conf("nameserver 192.168.1.1\n");
+        let resolver = resolver(vec![Upstream::System, plain("9.9.9.9:53")], &path);
+
+        std::fs::remove_file(&path).unwrap();
+        assert!(!resolver.refresh());
+        assert_eq!(
+            resolver.describe(),
+            vec!["udp://192.168.1.1:53", "udp://9.9.9.9:53"]
+        );
+    }
+
     #[test]
     fn configured_fallbacks_keep_their_place_across_a_refresh() {
         let dir = TempDir::new();
@@ -491,6 +530,26 @@ mod tests {
             resolver.describe(),
             vec!["udp://10.2.0.1:53", "udp://9.9.9.9:53"]
         );
+    }
+
+    /// The proxy decides whether to retry a failed query, and whether an answer
+    /// may still be cached, by comparing the handle it queried against the
+    /// current one — which is the only way a query that lost the race to swap
+    /// the resolvers can still tell that they moved. Both depend on a swap
+    /// producing a distinct handle, and on an unchanged set keeping its own.
+    #[test]
+    fn the_active_handle_changes_only_when_the_resolvers_do() {
+        let dir = TempDir::new();
+        let path = dir.resolv_conf("nameserver 192.168.1.1\n");
+        let resolver = resolver(vec![Upstream::System], &path);
+        let queried = resolver.active();
+
+        assert!(!resolver.refresh());
+        assert!(Arc::ptr_eq(&queried, &resolver.active()));
+
+        dir.resolv_conf("nameserver 10.2.0.1\n");
+        assert!(resolver.refresh());
+        assert!(!Arc::ptr_eq(&queried, &resolver.active()));
     }
 
     #[test]

@@ -12,9 +12,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ratblocker_core::{Configuration, Engine, Statistics};
 
-use crate::dns::cache::Cache;
+use crate::dns::cache::{Cache, Key};
 use crate::dns::message::BlockResponse;
-use crate::dns::upstream::Resolver;
+use crate::dns::upstream::{Resolver, Upstream};
 
 /// Counters the D-Bus API reports.
 #[derive(Debug, Default)]
@@ -89,6 +89,32 @@ impl DaemonState {
             cache.clear();
         }
         true
+    }
+
+    /// Cache an answer, unless the upstreams it came from are no longer the
+    /// ones in use.
+    ///
+    /// A query that started before a network change can still be answered by
+    /// the previous network — a Wi-Fi roam, or a tunnel whose kill switch has
+    /// not closed yet — and that answer is exactly what `refresh_upstreams`
+    /// just cleared the cache of. Testing under the cache lock is what makes
+    /// the two exclusive: the upstreams are swapped before the cache is
+    /// cleared, so an answer from a superseded set either lands before the
+    /// clear or is dropped here, never refills the cache after it.
+    pub fn cache_answer(
+        &self,
+        upstreams: &Arc<Vec<Upstream>>,
+        key: Key,
+        response: Vec<u8>,
+        ttl: Duration,
+    ) {
+        let Ok(mut cache) = self.cache.lock() else {
+            return;
+        };
+        if !Arc::ptr_eq(upstreams, &self.resolver.active()) {
+            return;
+        }
+        cache.insert(key, response, ttl);
     }
 
     /// A handle on the current engine. Cheap: one lock and an `Arc` clone.

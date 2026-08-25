@@ -50,7 +50,9 @@ portal's answer, or an address that is simply not reachable from the new
 network.
 
 If no resolver can be read at all — briefly true between networks — RatBlocker
-keeps the last set it knew rather than holding none.
+keeps the last set it knew rather than holding none — and rather than dropping
+to the public resolvers configured behind `system`, which would take names
+outside a tunnel that is still up.
 
 ## Filter rules do not target VPNs
 

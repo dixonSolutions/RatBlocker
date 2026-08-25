@@ -14,6 +14,7 @@ use ratblocker_core::FilterDecision;
 
 use super::cache::Key;
 use super::message::{self, MAX_MESSAGE};
+use super::upstream::Upstream;
 use crate::state::DaemonState;
 
 /// Concurrent upstream queries. Bounds memory and file descriptors, and stops
@@ -47,14 +48,33 @@ fn source_allowed(addr: &SocketAddr) -> bool {
 /// firewalls off the ones RatBlocker was using. Checking at the point of
 /// failure is what makes the query that noticed also the query that recovers,
 /// instead of leaving the machine without DNS until the next poll.
-async fn forward(state: &Arc<DaemonState>, request: &[u8]) -> Result<Vec<u8>> {
-    match state.resolver.resolve(request).await {
-        Ok(response) => Ok(response),
+///
+/// Whether to retry turns on the set that failed no longer being the set in
+/// use, not on this query being the one that replaced it. A kill switch drops
+/// packets rather than refusing them, so the first attempt spends the whole
+/// upstream timeout, by which time the two-second poll — or another query that
+/// failed alongside this one — has usually installed the new resolvers already.
+/// Retrying only for whichever query won that race would leave every other name
+/// in flight answered `SERVFAIL` with working upstreams already in place.
+///
+/// The set that answered comes back with the answer, so a reply from the
+/// previous network can be kept out of a cache already cleared for the new one.
+async fn forward(
+    state: &Arc<DaemonState>,
+    request: &[u8],
+) -> Result<(Vec<u8>, Arc<Vec<Upstream>>)> {
+    let tried = state.resolver.active();
+    match state.resolver.resolve(&tried, request).await {
+        Ok(response) => Ok((response, tried)),
         Err(error) => {
-            if !state.refresh_upstreams() {
+            // Whether this query is the one that swaps them does not matter.
+            state.refresh_upstreams();
+            let current = state.resolver.active();
+            if Arc::ptr_eq(&tried, &current) {
                 return Err(error);
             }
-            state.resolver.resolve(request).await
+            let response = state.resolver.resolve(&current, request).await?;
+            Ok((response, current))
         }
     }
 }
@@ -113,16 +133,19 @@ async fn handle(state: &Arc<DaemonState>, request: &[u8], source: SocketAddr) ->
 
     // 3. Forward.
     match forward(state, request).await {
-        Ok(response) => {
+        Ok((response, upstreams)) => {
             state.counters.forwarded.fetch_add(1, Ordering::Relaxed);
             let ttl = message::minimum_ttl(
                 &response,
                 query.question_end,
                 state.cache_floor.as_secs() as u32,
             );
-            if let Ok(mut cache) = state.cache.lock() {
-                cache.insert(key, response.clone(), Duration::from_secs(ttl as u64));
-            }
+            state.cache_answer(
+                &upstreams,
+                key,
+                response.clone(),
+                Duration::from_secs(ttl as u64),
+            );
             Some(response)
         }
         Err(error) => {
