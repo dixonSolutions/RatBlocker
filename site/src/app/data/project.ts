@@ -24,7 +24,7 @@ export const PROJECT = {
    * yourself route only.
    */
   amoSlug: 'ratblocker',
-  amoListed: false,
+  amoListed: true,
 } as const;
 
 /** Where a published add-on lives, derived from the slug AMO assigned. */
