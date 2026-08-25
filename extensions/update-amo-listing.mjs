@@ -21,7 +21,11 @@ import { credentials, call } from './amo.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '..');
 const dist = join(repo, 'dist');
+// AMO prefers 1280x800 screenshots; the banner is 1280x320, so the centred
+// preview is used when available. See design/README.md.
+const preview1280 = join(repo, 'design', 'preview-1280x800.png');
 const banner = join(repo, 'design', 'banner.png');
+const preview = existsSync(preview1280) ? preview1280 : banner;
 
 /** The add-on identifier AMO knows it by: the slug if a listing was recorded,
  * otherwise the gecko id from the manifest. */
@@ -39,15 +43,15 @@ async function addonId() {
 }
 
 async function main() {
-  if (!existsSync(banner)) {
-    throw new Error(`banner not found: ${banner}`);
+  if (!existsSync(preview)) {
+    throw new Error(`preview not found: ${preview}`);
   }
   const creds = await credentials();
   const id = await addonId();
-  console.log(`uploading banner as a preview for ${id}`);
+  console.log(`uploading preview for ${id}`);
 
   const form = new FormData();
-  form.append('image', new Blob([await readFile(banner)]), 'banner.png');
+  form.append('image', new Blob([await readFile(preview)]), 'preview.png');
   form.append('position', '1');
   const preview = await call(
     `/addons/addon/${encodeURIComponent(id)}/previews/`,

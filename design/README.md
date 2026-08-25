@@ -47,6 +47,12 @@ done
 
 # Banner.
 rsvg-convert -w 1280 design/banner.svg -o design/banner.png
+
+# AMO listing preview. AMO prefers 1280x800 screenshots; the banner is
+# 1280x320, so it is centred on the banner's own dark background to make a
+# preview that fills AMO's screenshot box without distortion.
+magick -size 1280x800 "xc:$(magick identify -format '%[pixel:p{2,2}]' design/banner.png)" \
+    -gravity center design/banner.png -composite design/preview-1280x800.png
 ```
 
 `banner.svg` sets type in a plain sans-serif stack rather than embedding

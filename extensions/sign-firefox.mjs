@@ -67,7 +67,11 @@ const LISTING = {
       + 'Filter lists update with the extension, and everything is open source under '
       + 'the GPL.',
   },
-  categories: ['privacy-security'],
+  categories: { firefox: ['privacy-security'], android: ['privacy-security'] },
+};
+// License belongs to the version, not the add-on, so it travels inside the
+// `version` object when the add-on is created.
+const VERSION_META = {
   license: 'GPL-3.0-or-later',
 };
 const DOWNLOAD_BASE =
@@ -140,8 +144,8 @@ async function main() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(
           CHANNEL === 'listed'
-            ? { upload: upload.uuid, ...LISTING }
-            : { upload: upload.uuid },
+            ? { ...LISTING, version: { upload: upload.uuid, ...VERSION_META } }
+            : { version: { upload: upload.uuid, ...VERSION_META } },
         ),
       },
       creds,
