@@ -105,7 +105,11 @@ jobs:
         run: |
           npm ci
           npm run typecheck
-          npm test
+          # The streaming-ads pruner is the extension logic that ships in the
+          # XPI, so it is re-validated here against the bundled script. The
+          # installer/setup tests (install.mjs, setup.sh/ps1) need real browsers
+          # the runner does not have; they run in the Tests workflow instead.
+          node --test tests/streaming-ads.test.mjs
           node build.mjs firefox
           node package.mjs firefox
 
