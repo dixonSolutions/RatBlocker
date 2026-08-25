@@ -84,18 +84,39 @@ export function token({ issuer, secret }) {
   return `${header}.${payload}.${signature}`;
 }
 
-/** Authenticated JSON request. Throws with the response body on a non-2xx. */
+/** Parse AMO's "Request was throttled. Expected available in N seconds." */
+function throttleSeconds(body) {
+  const m = /available in (\d+)\s*seconds/i.exec(body ?? '');
+  // Cap a single backoff at 10 minutes so a pathological value cannot stall
+  // a CI step for the whole job timeout; add a 2s grace margin.
+  return Math.min(m ? Number(m[1]) : 60, 600) + 2;
+}
+
+/** Authenticated JSON request. AMO throttles bursts of API calls with a 429
+ * that names how many seconds to wait, so on a 429 we sleep that long (plus a
+ * grace margin) and retry — up to a handful of times — rather than failing the
+ * whole publish/decorate step on a transient rate limit. Throws with the
+ * response body on any other non-2xx. A fresh JWT is minted per attempt. */
 export async function call(path, options = {}, creds) {
-  const response = await fetch(`${API}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `JWT ${token(creds)}`,
-      ...(options.headers ?? {}),
-    },
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`${options.method ?? 'GET'} ${path} -> ${response.status}: ${text.slice(0, 500)}`);
+  const maxRetries = 4;
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `JWT ${token(creds)}`,
+        ...(options.headers ?? {}),
+      },
+    });
+    const text = await response.text();
+    if (response.status === 429 && attempt < maxRetries) {
+      const wait = throttleSeconds(text);
+      console.log(`  throttled (429); retrying in ${wait}s (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise((r) => setTimeout(r, wait * 1000));
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(`${options.method ?? 'GET'} ${path} -> ${response.status}: ${text.slice(0, 500)}`);
+    }
+    return text === '' ? {} : JSON.parse(text);
   }
-  return text === '' ? {} : JSON.parse(text);
 }
