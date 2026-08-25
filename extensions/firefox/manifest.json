@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "RatBlocker",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local, privacy-preserving ad and tracker filtering. No account, no cloud, no HTTPS interception.",
   "browser_specific_settings": {
     "gecko": {
