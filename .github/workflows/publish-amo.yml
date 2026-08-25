@@ -64,23 +64,18 @@ jobs:
         with:
           node-version: 22
 
-      # Bump the patch version and commit it back to main before building, so
-      # the XPI that reaches AMO carries a version no previous release used and
-      # the next run starts from this one. Pushes made with GITHUB_TOKEN do not
-      # re-trigger workflows, so this cannot loop.
+      # Compute the next patch version and write it into the working tree
+      # (both manifests, package.json, Cargo.toml) so the build that reaches
+      # AMO carries a version no previous release used. The version is NOT
+      # committed yet — the commit + tag happen only after AMO accepts the
+      # upload (see "Commit release"), so a failed submit leaves no dangling
+      # tag to collide with the next run.
       - name: Bump version
         if: ${{ inputs.dry_run != true && (github.event_name == 'push' || inputs.skip_bump != true) }}
         id: bump
         run: |
           next=$(node extensions/bump-version.mjs | tail -1 | awk '{print $2}')
           echo "version=$next" >> "$GITHUB_OUTPUT"
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add extensions/firefox/manifest.json extensions/chromium/manifest.json extensions/package.json Cargo.toml
-          git commit -m "Release v$next [skip ci]"
-          git tag "v$next"
-          git push
-          git push --tags
 
       # The same build the site publishes, so what is submitted to Mozilla and
       # what is offered for a store-free install are the same artefact.
@@ -145,6 +140,24 @@ jobs:
             exit 1
           fi
           node sign-firefox.mjs --channel "${{ inputs.channel || 'listed' }}"
+
+      # AMO has accepted the upload, so seal the release: commit the bumped
+      # version and tag it now. Doing this only after a successful submit means
+      # a failed (or throttled) submit leaves no tag behind, so re-running the
+      # job recomputes the same version and retries cleanly instead of
+      # colliding on an existing tag. Pushes made with GITHUB_TOKEN do not
+      # re-trigger workflows, so this cannot loop.
+      - name: Commit release
+        if: ${{ inputs.dry_run != true && (github.event_name == 'push' || inputs.skip_bump != true) }}
+        run: |
+          next="${{ steps.bump.outputs.version }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add extensions/firefox/manifest.json extensions/chromium/manifest.json extensions/package.json Cargo.toml
+          git commit -m "Release v$next [skip ci]"
+          git tag "v$next"
+          git push
+          git push --tags
 
       # The listing address the site's install button points at. Committed back
       # so the site links to the real add-on rather than to a URL someone typed
