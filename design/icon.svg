@@ -1,61 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"
-     role="img" aria-label="RatBlocker">
+     color="#8b1e3f" role="img" aria-label="RatBlocker">
   <title>RatBlocker</title>
-
   <!--
-    Authoritative source for every RatBlocker icon. Hand-authored: edit this,
-    then re-run the render command in design/README.md.
-
-    Two jobs, split between two shapes. The shield carries the silhouette at
-    16px, where it is the only thing a browser toolbar can resolve, and it is
-    what says "blocker". The rodent head inside it says "rat", and only has to
-    read from 32px up.
-
-    What makes the head legible is the ear: it sits high and to the back so it
-    breaks the skull's outline as a distinct bump, rather than merging into it
-    and leaving an anonymous blob. The snout is deliberately short and blunt —
-    a long taper looks elegant at 512px and dissolves at 32px.
+    Authoritative source for every RatBlocker icon. Auto-traced from
+    design/reference-rat.png with design/trace-rat.py (Moore-neighbor
+    boundary trace + Douglas-Peucker simplification). To re-derive, edit the
+    reference image (or the tracer) and re-run the render command in
+    design/README.md. The mark is a single rat silhouette in the brand
+    accent #8b1e3f, facing right; it carries at every size, and the shield
+    the old icon wrapped it in has been dropped for a cleaner mark.
   -->
-  <path fill="#8b1e3f"
-        d="M64 5 112 22 Q118 24 118 30 V58 C118 88 98 111 66 123 Q64 124 62 123
-           C30 111 10 88 10 58 V30 Q10 24 16 22 Z"/>
-
-  <!--
-    Head in profile, facing left. Drawn on its own 128 grid so design/banner.svg
-    can reuse this group verbatim, then scaled into the shield's safe area.
-
-    Authored as one closed outline rather than a union of circles and wedges.
-    Unions kept collapsing into an anonymous teardrop: the ear merged into the
-    skull and the muzzle read as a flag.
-
-    The whiskers are doing more work than they look. A tapered muzzle with a
-    round ear reads just as easily as a bird — muzzle as beak, ear as skull —
-    and no amount of reshaping the outline fixed that. Three strokes leaving
-    the snout settle it instantly. They originate just inside the muzzle near
-    the nose tip (10,74) so they read as growing from the nose, not floating
-    beside it; a start point even a few pixels out leaves a gap that reads as
-    a detached scribble. They fall below a pixel at 16px and simply
-    disappear, which is fine: at that size the shield is carrying the mark.
-  -->
-  <g transform="translate(65 66) scale(0.64) translate(-58 -53)">
-    <g stroke="#fff" stroke-width="4.5" stroke-linecap="round" fill="none">
-      <path d="M14 73 C 6 68, 0 63, -4 58"/>
-      <path d="M12 74 C 5 73, 0 73, -5 72"/>
-      <path d="M14 76 C 6 77, 0 78, -4 81"/>
-    </g>
-
-    <path fill="#fff" d="
-      M 10 74
-      C 20 65, 32 55, 46 47
-      C 55 42, 60 40, 64 37
-      C 65 19, 77 5, 90 9
-      C 104 13, 107 32, 99 43
-      C 107 55, 106 72, 95 83
-      C 82 96, 60 100, 44 92
-      C 32 86, 20 80, 10 74
-      Z"/>
-
-    <!-- Knocked out of the white, not drawn on top: gives the eye a hard edge. -->
-    <circle cx="48" cy="64" r="7.5" fill="#8b1e3f"/>
-  </g>
+<path id="rat" fill="currentColor" d="M 84.71 4.05 L 85.96 4.05 L 86.27 4.36 L 87.82 4.36 L 89.69 5.29 L 90.32 5.29 L 90.94 5.92 L 92.18 6.54 L 93.43 7.79 L 94.36 9.03 L 94.36 9.34 L 95.61 11.52 L 95.92 13.39 L 96.55 14.64 L 97.17 14.64 L 98.41 15.26 L 99.35 15.26 L 99.66 15.57 L 100.28 15.57 L 100.59 15.88 L 101.22 15.88 L 101.53 16.19 L 102.15 16.19 L 102.46 16.51 L 103.09 16.51 L 103.40 16.82 L 104.95 17.13 L 105.89 17.75 L 107.45 18.06 L 108.38 18.69 L 109.94 19.00 L 110.87 19.62 L 111.49 19.62 L 112.43 20.24 L 113.05 20.24 L 113.99 20.87 L 114.61 20.87 L 114.92 21.18 L 116.17 21.80 L 116.79 21.80 L 117.10 22.11 L 117.41 22.11 L 117.72 22.42 L 118.03 22.42 L 120.21 23.67 L 120.84 23.67 L 121.46 24.29 L 122.08 24.29 L 122.71 24.91 L 123.64 25.23 L 124.57 25.85 L 126.13 27.41 L 126.44 27.41 L 127.38 28.65 L 128.00 30.21 L 127.69 31.45 L 127.07 32.70 L 126.44 33.64 L 124.57 35.50 L 124.57 35.82 L 124.26 35.82 L 123.02 37.06 L 122.71 37.06 L 121.15 38.31 L 119.28 39.24 L 118.66 39.24 L 117.41 39.86 L 116.79 40.80 L 115.54 42.04 L 114.61 42.67 L 113.99 42.67 L 113.05 43.29 L 110.87 43.60 L 110.56 43.91 L 103.09 43.91 L 102.77 44.22 L 101.53 44.22 L 99.97 45.47 L 99.66 45.47 L 98.41 46.72 L 98.41 47.03 L 97.79 47.65 L 97.79 47.96 L 96.55 50.14 L 96.55 50.76 L 96.23 51.08 L 96.23 51.70 L 95.61 52.94 L 95.61 54.19 L 95.30 54.50 L 95.30 55.75 L 94.99 56.06 L 94.99 57.30 L 97.48 59.80 L 97.79 59.80 L 99.04 61.04 L 100.59 61.98 L 101.22 63.53 L 101.22 65.40 L 101.53 65.71 L 101.53 69.14 L 100.59 69.76 L 99.35 69.76 L 98.73 69.45 L 97.48 67.89 L 97.48 66.65 L 97.17 66.02 L 96.55 65.40 L 95.30 64.78 L 93.74 64.47 L 93.12 65.09 L 93.12 65.71 L 92.50 66.65 L 92.50 67.27 L 91.87 68.52 L 91.25 69.14 L 90.94 70.07 L 90.00 71.32 L 87.82 73.50 L 87.51 73.50 L 85.96 74.74 L 85.64 74.74 L 85.33 75.06 L 85.02 75.06 L 84.71 75.37 L 84.40 75.37 L 82.22 76.61 L 80.35 76.92 L 79.10 77.55 L 77.86 77.55 L 77.55 77.86 L 76.30 77.86 L 75.06 78.17 L 75.06 77.55 L 75.99 75.68 L 75.99 74.74 L 76.61 73.50 L 76.61 72.25 L 76.92 71.94 L 76.92 69.76 L 77.24 69.45 L 77.24 64.78 L 76.92 64.47 L 76.92 62.29 L 76.61 61.98 L 76.61 61.04 L 76.30 60.73 L 76.30 59.48 L 75.99 58.55 L 75.37 57.62 L 75.06 56.06 L 74.43 55.44 L 73.81 53.88 L 73.19 52.94 L 71.63 51.39 L 71.32 50.76 L 70.38 50.14 L 70.07 50.45 L 70.07 50.76 L 71.01 52.01 L 71.32 53.26 L 72.25 54.81 L 72.25 55.44 L 72.88 56.68 L 72.88 57.62 L 73.19 57.93 L 73.19 58.86 L 73.50 59.17 L 73.50 60.11 L 73.81 60.42 L 73.81 62.60 L 74.12 62.91 L 74.12 68.52 L 73.81 68.83 L 73.81 70.70 L 73.50 71.01 L 73.50 72.25 L 73.19 72.56 L 72.88 74.74 L 72.56 75.06 L 72.56 75.68 L 71.94 76.61 L 71.94 77.24 L 71.01 79.10 L 70.38 79.73 L 70.07 80.66 L 68.52 82.53 L 68.52 82.84 L 65.40 85.96 L 64.16 86.89 L 64.47 87.20 L 82.22 87.20 L 83.15 87.51 L 83.78 87.82 L 85.33 89.38 L 85.64 91.25 L 85.96 91.56 L 85.96 92.18 L 85.64 92.50 L 85.33 94.05 L 84.09 95.30 L 82.84 95.92 L 81.60 95.92 L 81.28 96.23 L 34.57 96.23 L 34.26 95.92 L 33.01 95.92 L 32.08 95.61 L 31.14 94.99 L 29.90 93.74 L 28.03 93.74 L 27.72 94.05 L 21.18 94.05 L 20.87 94.36 L 18.37 94.36 L 18.06 94.68 L 16.51 94.68 L 16.19 94.99 L 14.95 94.99 L 13.70 95.30 L 13.39 95.61 L 12.77 95.61 L 12.46 95.92 L 11.83 95.92 L 10.28 96.55 L 9.34 97.17 L 7.47 99.04 L 7.16 99.66 L 7.16 100.91 L 6.85 101.22 L 7.47 103.40 L 9.34 105.27 L 9.65 105.27 L 11.83 106.51 L 12.77 106.51 L 13.08 106.82 L 13.70 106.82 L 14.95 107.45 L 15.88 107.45 L 16.19 107.76 L 18.37 108.07 L 18.69 108.38 L 19.31 108.38 L 19.62 108.69 L 20.24 108.69 L 20.55 109.00 L 21.18 109.00 L 21.49 109.31 L 23.05 109.63 L 23.36 109.94 L 23.67 109.94 L 23.98 110.25 L 26.16 111.18 L 27.41 112.12 L 28.96 113.67 L 28.96 113.99 L 30.21 115.54 L 30.21 116.17 L 30.83 117.10 L 30.83 120.53 L 29.90 122.08 L 29.27 122.71 L 28.34 123.33 L 26.47 123.64 L 26.16 123.95 L 25.23 123.95 L 23.67 123.33 L 23.67 122.71 L 25.54 121.15 L 26.16 119.28 L 25.54 117.72 L 23.05 115.23 L 22.11 114.92 L 21.49 114.30 L 19.62 113.36 L 19.00 113.36 L 18.69 113.05 L 18.06 113.05 L 16.82 112.43 L 14.64 112.12 L 13.39 111.49 L 12.46 111.49 L 12.15 111.18 L 11.52 111.18 L 11.21 110.87 L 10.59 110.87 L 10.28 110.56 L 9.65 110.56 L 9.34 110.25 L 7.79 109.94 L 7.47 109.63 L 7.16 109.63 L 6.85 109.31 L 4.67 108.38 L 3.74 107.76 L 1.25 105.27 L 0.62 104.02 L 0.31 103.09 L 0.31 101.84 L 0.00 101.53 L 0.00 100.28 L 0.31 99.97 L 0.31 98.41 L 0.93 97.48 L 1.25 96.23 L 1.87 95.30 L 3.11 94.05 L 3.11 93.74 L 3.43 93.74 L 4.98 92.18 L 5.92 91.56 L 6.23 91.56 L 6.54 91.25 L 6.85 91.25 L 7.16 90.94 L 7.47 90.94 L 9.65 89.69 L 10.28 89.69 L 11.21 89.07 L 11.83 89.07 L 12.15 88.76 L 12.77 88.76 L 13.08 88.45 L 13.70 88.45 L 14.01 88.14 L 15.57 87.82 L 16.51 87.20 L 17.13 87.20 L 18.69 85.96 L 18.69 84.40 L 18.37 84.09 L 18.37 83.46 L 17.75 82.53 L 17.75 81.91 L 16.82 80.04 L 16.82 79.10 L 16.51 78.79 L 16.19 77.86 L 16.19 76.61 L 15.88 76.30 L 15.88 75.06 L 15.57 74.74 L 15.57 72.56 L 15.26 72.25 L 15.26 61.04 L 15.57 60.73 L 15.57 58.55 L 15.88 58.24 L 15.88 56.68 L 16.19 56.37 L 16.19 54.81 L 16.51 54.50 L 16.51 53.57 L 16.82 53.26 L 16.82 52.32 L 17.13 52.01 L 17.13 51.08 L 17.44 50.76 L 17.44 50.14 L 17.75 49.83 L 18.06 48.27 L 18.69 47.34 L 18.69 46.72 L 19.00 46.40 L 19.00 46.09 L 19.31 45.78 L 19.31 45.47 L 19.62 45.16 L 19.62 44.85 L 19.93 44.54 L 20.87 42.36 L 21.49 41.73 L 21.80 40.80 L 23.36 38.93 L 23.36 38.62 L 28.03 33.95 L 28.34 33.95 L 29.27 33.01 L 29.59 33.01 L 31.14 31.77 L 31.45 31.77 L 31.77 31.45 L 32.08 31.45 L 32.39 31.14 L 32.70 31.14 L 33.01 30.83 L 33.32 30.83 L 35.50 29.59 L 37.06 29.27 L 38.00 28.65 L 38.93 28.65 L 39.24 28.34 L 41.42 28.03 L 41.73 27.72 L 42.98 27.72 L 43.29 27.41 L 45.16 27.41 L 45.47 27.09 L 49.21 27.09 L 49.52 26.78 L 52.01 26.78 L 52.32 27.09 L 56.68 27.09 L 56.99 27.41 L 58.86 27.41 L 59.17 27.72 L 60.73 27.72 L 61.04 28.03 L 63.22 28.03 L 63.53 28.34 L 65.71 28.34 L 66.02 28.03 L 67.27 28.03 L 68.20 27.72 L 69.76 26.47 L 70.38 25.23 L 70.38 24.29 L 70.07 23.98 L 69.14 22.11 L 69.14 21.49 L 68.83 21.18 L 68.83 17.44 L 69.45 16.51 L 69.45 15.88 L 71.01 14.01 L 72.88 13.08 L 74.12 12.77 L 75.37 13.08 L 75.68 12.77 L 75.68 12.15 L 75.99 11.83 L 76.30 10.28 L 77.24 8.41 L 77.86 7.47 L 79.10 6.23 L 79.42 6.23 L 80.97 4.98 L 81.60 4.98 L 82.84 4.36 L 84.40 4.36 Z"/>
 </svg>

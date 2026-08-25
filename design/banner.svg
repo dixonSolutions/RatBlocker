@@ -3,62 +3,22 @@
   <title>RatBlocker</title>
 
   <!--
-    Authoritative source for design/banner.png. Hand-authored: edit this, then
-    re-run the render command in design/README.md.
-
-    The banner carries its own dark field rather than a transparent one so it
-    reads the same in a light or a dark README. That field forces the mark to
-    invert (white shield, plum rat) — the shapes are identical to
-    design/icon.svg, only the two inks are swapped.
+    Authoritative source for design/banner.png. The rat is defined once in
+    design/icon.svg (id="rat", fill="currentColor") and reused here in white
+    on the dark field, so the mark stays in sync with the icon by construction
+    rather than by hand. Edit the rat in design/icon.svg (or the
+    reference image design/reference-rat.png) and re-run the render
+    command in design/README.md. A single mark, once — no faded echo.
   -->
-
-  <defs>
-    <!--
-      The mark is defined once and placed twice: once as the lock-up, once
-      oversized and nearly transparent to weight the empty right-hand side.
-    -->
-    <g id="mark">
-      <path fill="#ffffff"
-            d="M64 5 112 22 Q118 24 118 30 V58 C118 88 98 111 66 123 Q64 124 62 123
-               C30 111 10 88 10 58 V30 Q10 24 16 22 Z"/>
-      <!--
-        Identical geometry to design/icon.svg, with the two inks swapped so the
-        mark survives on the dark field. Kept in sync by hand: if the head in
-        icon.svg changes, change it here too.
-      -->
-      <g transform="translate(65 66) scale(0.64) translate(-58 -53)">
-        <g stroke="#2a0f1c" stroke-width="4.5" stroke-linecap="round" fill="none">
-          <path d="M14 73 C 6 68, 0 63, -4 58"/>
-          <path d="M12 74 C 5 73, 0 73, -5 72"/>
-          <path d="M14 76 C 6 77, 0 78, -4 81"/>
-        </g>
-        <path fill="#2a0f1c" d="
-          M 10 74
-          C 20 65, 32 55, 46 47
-          C 55 42, 60 40, 64 37
-          C 65 19, 77 5, 90 9
-          C 104 13, 107 32, 99 43
-          C 107 55, 106 72, 95 83
-          C 82 96, 60 100, 44 92
-          C 32 86, 20 80, 10 74
-          Z"/>
-        <circle cx="48" cy="64" r="7.5" fill="#ffffff"/>
-      </g>
-    </g>
-  </defs>
 
   <rect width="1280" height="320" fill="#2a0f1c"/>
 
-  <!-- A single mark, once. An earlier version echoed the mark oversized and
-       nearly transparent in the bottom-right to weight the empty side, but a
-       cropped second mark reads as a duplicate logo, so it was removed. The
-       right-hand side is carried by the wordmark and the accent rule instead. -->
-  <use href="#mark" transform="translate(150 72) scale(1.375)"/>
+  <use href="icon.svg#rat" color="#ffffff" transform="translate(120 64) scale(1.5)"/>
 
   <g font-family="Lato, 'DejaVu Sans', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-    <text x="378" y="154" font-size="96" font-weight="700" letter-spacing="-2.5"
+    <text x="360" y="188" font-size="96" font-weight="700" letter-spacing="-2.5"
           fill="#ffffff">RatBlocker</text>
-    <rect x="380" y="180" width="72" height="5" rx="2.5" fill="#e0698a"/>
-    <text x="378" y="226" font-size="34" fill="#e6b3c3">Local, private ad and tracker blocking.</text>
+    <rect x="362" y="208" width="72" height="5" rx="2.5" fill="#e0698a"/>
+    <text x="360" y="250" font-size="34" fill="#e6b3c3">Local, private ad and tracker blocking.</text>
   </g>
 </svg>
