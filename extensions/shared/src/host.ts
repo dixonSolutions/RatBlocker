@@ -19,6 +19,7 @@ import {
   type Settings,
 } from './settings.js';
 import { Statistics } from './statistics.js';
+import { checkForUpdates } from './updates.js';
 import type { FilterResult } from './types.js';
 import { RatBlockerEngine } from './wasm.js';
 
@@ -261,9 +262,31 @@ export class ExtensionHost {
           return { ok: true, css, count: css === '' ? 0 : css.split(',').length };
         }
 
+        /**
+         * Does filtering apply to this page right now? Asked by the content
+         * script on behalf of the MAIN-world pruner, which cannot read
+         * settings itself. Answering false (or not at all) leaves it inert.
+         */
+        case 'shouldFilter': {
+          let hostname: string;
+          try {
+            hostname = new URL(message.url).hostname;
+          } catch {
+            return { ok: true, filtering: false };
+          }
+          return {
+            ok: true,
+            filtering: this.filteringActive && !this.isAllowlisted(hostname),
+          };
+        }
+
         case 'resetStatistics':
           this.stats.reset();
           return { ok: true };
+
+        /** Force a poll now, bypassing the interval guard. */
+        case 'checkForUpdates':
+          return { ok: true, update: await checkForUpdates({ force: true }) };
 
         case 'getDiagnostics':
           return { ok: true, diagnostics: this.diagnostics() };

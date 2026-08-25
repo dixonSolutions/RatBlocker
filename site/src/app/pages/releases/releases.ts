@@ -57,8 +57,7 @@ export class Releases {
     'Filter compiler producing a versioned binary database plus Chromium rulesets.',
     'Chromium MV3 extension with near-complete EasyList coverage under the rule cap.',
     'Firefox extension running the full engine through blocking webRequest.',
-    'Linux daemon: caching DNS proxy, D-Bus API, Polkit authorization, atomic filter updates with rollback.',
-    'Command-line client for the daemon.',
+    'YouTube in-video ad blocking: ad decisions are pruned from the player response in the extension.',
   ];
 
   readonly known = [

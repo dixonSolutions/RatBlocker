@@ -115,6 +115,16 @@ async function packChromium() {
   if (!existsSync(build)) throw new Error(`build first: ${build} does not exist`);
 
   await mkdir(dist, { recursive: true });
+
+  // The CRX must carry the address it will be updated from. Without an
+  // update_url Chromium assumes the Web Store, and an extension that is not
+  // there simply never updates. This is injected at packaging time rather than
+  // kept in the source manifest because it is a distribution concern: a
+  // development build loaded unpacked has no business polling anything.
+  const manifestPath = join(build, 'manifest.json');
+  const buildManifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  buildManifest.update_url = `${UPDATE_BASE}/chromium-update.xml`;
+  await writeFile(manifestPath, `${JSON.stringify(buildManifest, null, 2)}\n`);
   const key = join(repo, 'chromium-signing-key.pem');
   const isNewKey = !existsSync(key);
 
@@ -166,19 +176,94 @@ async function packChromium() {
     )}\n`,
   );
 
-  // The same id, expressed as enterprise policy, for a genuinely remote host.
+  // The same id expressed as enterprise policy, per platform.
+  //
+  // This is not merely an alternative to the external-extension descriptor: on
+  // Windows and macOS, Chrome refuses to install an external extension that is
+  // not hosted in the Web Store, so policy is the *only* store-free route
+  // there. Each operating system reads policy from somewhere different and in
+  // a different format, so each gets its own artefact.
+  const updateUrl = `${UPDATE_BASE}/chromium-update.xml`;
+  const settings = {
+    installation_mode: 'normal_installed',
+    update_url: updateUrl,
+    toolbar_pin: 'force_pinned',
+  };
+  const policyDir = join(dist, 'policy');
+  await mkdir(policyDir, { recursive: true });
+
+  // Linux: a JSON file dropped into the managed-policy directory.
+  const policyJson = `${JSON.stringify({ ExtensionSettings: { [id]: settings } }, null, 2)}\n`;
+  await writeFile(join(dist, 'chromium-policy.json'), policyJson);
+  await writeFile(join(policyDir, 'linux-policy.json'), policyJson);
+
+  // Windows: registry values under the policy hive. ExtensionSettings is
+  // expressed as one subkey per extension id, each value a REG_SZ.
+  const regEscape = (value) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  for (const [vendor, hive] of [
+    ['chrome', 'SOFTWARE\\Policies\\Google\\Chrome'],
+    ['chromium', 'SOFTWARE\\Policies\\Chromium'],
+  ]) {
+    const lines = [
+      'Windows Registry Editor Version 5.00',
+      '',
+      '; RatBlocker, installed from a host you control rather than the Web',
+      '; Store. Chrome on Windows refuses off-store external extensions, so',
+      '; policy is the supported route. Import with:  reg import <this file>',
+      '; (an elevated prompt), then restart the browser.',
+      '',
+      `[HKEY_LOCAL_MACHINE\\${hive}\\ExtensionSettings]`,
+      '',
+      `[HKEY_LOCAL_MACHINE\\${hive}\\ExtensionSettings\\${id}]`,
+      `"installation_mode"="${regEscape(settings.installation_mode)}"`,
+      `"update_url"="${regEscape(settings.update_url)}"`,
+      `"toolbar_pin"="${regEscape(settings.toolbar_pin)}"`,
+      '',
+    ];
+    await writeFile(join(policyDir, `windows-${vendor}.reg`), lines.join('\r\n'));
+  }
+
+  // macOS: a managed-preferences property list.
+  const plistEntries = Object.entries(settings)
+    .map(([k, v]) => `        <key>${k}</key>\n        <string>${v}</string>`)
+    .join('\n');
+  for (const [vendor, domain] of [
+    ['chrome', 'com.google.Chrome'],
+    ['chromium', 'org.chromium.Chromium'],
+  ]) {
+    await writeFile(
+      join(policyDir, `macos-${domain}.plist`),
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  RatBlocker for ${vendor} on macOS. Chrome refuses off-store external
+  extensions here, so policy is the supported route. Deploy through MDM, or
+  for a single machine copy to /Library/Managed Preferences/${domain}.plist
+  and restart the browser.
+-->
+<plist version="1.0">
+  <dict>
+    <key>ExtensionSettings</key>
+    <dict>
+      <key>${id}</key>
+      <dict>
+${plistEntries}
+      </dict>
+    </dict>
+  </dict>
+</plist>
+`,
+    );
+  }
+
+  // The remote variant: Chromium fetches the CRX named by the update manifest
+  // and keeps it current, with nothing installed locally. `external_crx` and
+  // `external_update_url` are alternatives, so they ship as separate files
+  // rather than one ambiguous descriptor.
   await writeFile(
-    join(dist, 'chromium-policy.json'),
+    join(dist, `${id}.update.json`),
     `${JSON.stringify(
-      {
-        ExtensionSettings: {
-          [id]: {
-            installation_mode: 'normal_installed',
-            update_url: `${UPDATE_BASE}/chromium-update.xml`,
-            toolbar_pin: 'force_pinned',
-          },
-        },
-      },
+      { external_update_url: `${UPDATE_BASE}/chromium-update.xml` },
       null,
       2,
     )}\n`,
@@ -188,7 +273,11 @@ async function packChromium() {
   console.log(`crx                    ${relative(repo, crx)} (${(size / 1024 / 1024).toFixed(1)} MiB)`);
   console.log(`update manifest        dist/chromium-update.xml`);
   console.log(`local install          dist/${id}.json -> /usr/share/chromium/extensions/`);
-  console.log(`remote install policy  dist/chromium-policy.json -> /etc/chromium/policies/managed/`);
+  console.log(`remote install         dist/${id}.update.json -> same directory`);
+  console.log(`policy (linux)         dist/policy/linux-policy.json`);
+  console.log(`policy (windows)       dist/policy/windows-{chrome,chromium}.reg`);
+  console.log(`policy (macos)         dist/policy/macos-*.plist`);
+  console.log(`update url             ${UPDATE_BASE}/chromium-update.xml`);
   return id;
 }
 
@@ -198,7 +287,22 @@ async function packFirefox() {
   if (!existsSync(build)) throw new Error(`build first: ${build} does not exist`);
   await mkdir(dist, { recursive: true });
 
-  const manifest = JSON.parse(await readFile(join(build, 'manifest.json'), 'utf8'));
+  const manifestPath = join(build, 'manifest.json');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+
+  // Same reasoning as Chromium: where to check for updates is a property of
+  // the distribution, not of the source tree. AMO forbids `update_url` on
+  // listed (Mozilla-hosted) add-ons — it serves updates itself — so the field
+  // is injected only for self-hosted (unlisted) packaging.
+  const updateManifestUrl = `${UPDATE_BASE}/firefox-updates.json`;
+  const selfHosted = process.env.RATBLOCKER_CHANNEL !== 'listed';
+  if (selfHosted) {
+    manifest.browser_specific_settings.gecko.update_url = updateManifestUrl;
+  } else {
+    delete manifest.browser_specific_settings.gecko.update_url;
+  }
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
   const xpi = join(dist, `ratblocker-firefox-${manifest.version}.xpi`);
 
   // Deterministic ordering keeps the archive reproducible.
@@ -216,8 +320,33 @@ async function packFirefox() {
 
   execFileSync('zip', ['-q', '-X', '-9', xpi, ...entries], { cwd: build });
   const size = (await stat(xpi)).size;
+
+  // The manifest Gecko polls. `update_link` must be https: Firefox refuses to
+  // fetch an update over plain http regardless of the signature on the file.
+  const id = manifest.browser_specific_settings.gecko.id;
+  await writeFile(
+    join(dist, 'firefox-updates.json'),
+    `${JSON.stringify(
+      {
+        addons: {
+          [id]: {
+            updates: [
+              {
+                version: manifest.version,
+                update_link: `${UPDATE_BASE}/ratblocker-firefox-${manifest.version}.xpi`,
+              },
+            ],
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
   console.log(`\nfirefox xpi            ${relative(repo, xpi)} (${(size / 1024 / 1024).toFixed(1)} MiB)`);
-  console.log(`extension id           ${manifest.browser_specific_settings.gecko.id}`);
+  console.log(`extension id           ${id}`);
+  console.log(`update manifest        dist/firefox-updates.json`);
+  console.log(`update url             ${updateManifestUrl}`);
   console.log('This XPI is unsigned. Release Firefox will only install it');
   console.log('temporarily; run sign-firefox.mjs to have Mozilla sign it for');
   console.log('self-hosted (unlisted) distribution.');

@@ -8,10 +8,17 @@ heuristic.
 
 | Capability | Browser pages and installed web apps | Native applications |
 | --- | --- | --- |
-| Known ad/tracker host blocking | Full URL and request context | Hostname through the system DNS proxy |
-| Internal/first-party ad URL matching | Yes, including path and popup context | Only when the hostname itself is blocked |
-| Popup blocking | Yes, for destinations matched by `$popup` rules | No: DNS cannot tell why an app resolved a host |
-| Ad element hiding | Yes, with supported EasyList cosmetic selectors | No general, safe platform API |
+| Known ad/tracker host blocking | Full URL and request context | Not covered |
+| Internal/first-party ad URL matching | Yes, including path and popup context | Not covered |
+| Popup blocking | Yes, for destinations matched by `$popup` rules | Not covered |
+| Ad element hiding | Yes, with supported EasyList cosmetic selectors | Not covered |
+| In-video ad decisions (YouTube) | Yes, by pruning the player response | Not covered |
+
+Native desktop applications are outside RatBlocker's scope. The Linux DNS
+daemon that once covered them has been removed: it could only ever match a
+bare hostname, which is not enough to distinguish an ad from content on any
+service that serves both from one origin. A system-wide Android service is
+planned and will face the same hostname-only limit.
 
 Browser extensions also run in browser-installed web apps when the browser
 allows extensions on their pages.
@@ -34,11 +41,12 @@ false positives for sign-in, payment, and document workflows.
 
 ## Native-application boundary
 
-The Linux daemon sees DNS questions: a hostname, query type, and local network
-source. It cannot see an HTTPS URL, the link that initiated a request, whether
-the application opened a popup, or the application's widget tree. It can still
-block a known ad or tracker hostname before any connection is made, which
-covers all applications using the system resolver.
+A hostname is not enough. A DNS-level filter sees a name, a query type and a
+local source; it cannot see an HTTPS URL, the link that initiated a request,
+whether an application opened a popup, or the application's widget tree. That
+is sufficient to block a dedicated ad or tracker host, and insufficient for any
+service that serves ads and content from the same origin — which is now the
+common case, not the exception.
 
 Removing arbitrary UI elements would require accessibility automation,
 application-specific plugins, or compositor injection. Those mechanisms can

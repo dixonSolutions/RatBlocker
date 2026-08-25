@@ -13,6 +13,7 @@
 
 import { api } from '../../shared/src/browser.js';
 import { ExtensionHost } from '../../shared/src/host.js';
+import { scheduleUpdateChecks } from '../../shared/src/updates.js';
 import type { Message } from '../../shared/src/messaging.js';
 
 /** Dynamic rule id ranges, kept apart so each can be replaced independently. */
@@ -220,6 +221,10 @@ async function main(): Promise<void> {
       return true;
     },
   );
+
+  // Self-hosted installs update through the browser, but only if it is
+  // asked to look; its own poll interval can be hours away.
+  scheduleUpdateChecks();
 
   void api.action.setBadgeBackgroundColor({ color: '#8b1e3f' });
   console.info(`RatBlocker: core ${host.engine?.version ?? 'unavailable'} ready`);

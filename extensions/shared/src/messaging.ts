@@ -29,13 +29,17 @@ export type Message =
   | { type: 'getSettings' }
   | { type: 'saveSettings'; settings: Settings }
   | { type: 'getCosmetic'; url: string }
+  | { type: 'shouldFilter'; url: string }
   | { type: 'resetStatistics' }
+  | { type: 'checkForUpdates' }
   | { type: 'getDiagnostics' };
 
 export type Response =
   | { ok: true; status: StatusReport }
   | { ok: true; settings: Settings }
   | { ok: true; css: string; count: number }
+  | { ok: true; filtering: boolean }
+  | { ok: true; update: { status: string; version?: string } | null }
   | { ok: true; diagnostics: Record<string, unknown> }
   | { ok: true }
   | { ok: false; error: string };

@@ -18,7 +18,9 @@
     "webRequest",
     "tabs"
   ],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -37,8 +39,25 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.youtube-nocookie.com/*"
+      ],
+      "js": [
+        "streaming-ads.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }
@@ -48,15 +67,32 @@
   },
   "declarative_net_request": {
     "rule_resources": [
-      { "id": "ruleset_0", "enabled": true, "path": "rules/ruleset_0.json" },
-      { "id": "ruleset_1", "enabled": true, "path": "rules/ruleset_1.json" },
-      { "id": "ruleset_2", "enabled": true, "path": "rules/ruleset_2.json" }
+      {
+        "id": "ruleset_0",
+        "enabled": true,
+        "path": "rules/ruleset_0.json"
+      },
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules/ruleset_1.json"
+      },
+      {
+        "id": "ruleset_2",
+        "enabled": true,
+        "path": "rules/ruleset_2.json"
+      }
     ]
   },
   "web_accessible_resources": [
     {
-      "resources": ["redirects/*"],
-      "matches": ["http://*/*", "https://*/*"]
+      "resources": [
+        "redirects/*"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
     }
   ]
 }

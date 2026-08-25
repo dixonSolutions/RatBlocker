@@ -7,7 +7,7 @@
 
   <h2>One engine, compiled twice</h2>
   <p>
-    The filtering logic is a single Rust crate. It is compiled natively for the Linux daemon and to
+    The filtering logic is a single Rust crate. It is compiled to
     WebAssembly for the browser extensions, which is what stops the two drifting apart: a rule that
     blocks in Firefox blocks identically on the system layer, because it is literally the same code
     reaching the same conclusion.
@@ -113,15 +113,3 @@
     }
   </p-accordion>
 
-  <h2>Authorization is the daemon's job</h2>
-  <p>
-    The Linux service exposes a D-Bus API, and every call that changes something is checked against
-    Polkit inside the daemon. A greyed-out button in a settings window is a courtesy to the user,
-    not a security control — so the daemon assumes its callers may be lying and asks anyway.
-  </p>
-  <p>
-    It runs under its own account with one capability, <code>CAP_NET_BIND_SERVICE</code>, and
-    nothing else. Installing it does not redirect your DNS; that is a separate unit you enable
-    deliberately, and stopping it puts your resolver configuration back.
-  </p>
-</div>

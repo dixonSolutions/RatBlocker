@@ -10,6 +10,42 @@
     covered by tests, but treat it as early software.
   </p-message>
 
+  @if (project.amoListed) {
+    <h2>Get it from Mozilla</h2>
+    <p>
+      RatBlocker is in the Firefox add-on catalogue. Mozilla signs it, hosts it and delivers its
+      updates, which is the shortest route on any Firefox-based browser and the only one that
+      needs no build and no terminal.
+    </p>
+    <p>
+      <a [href]="amo.listingUrl" rel="noopener">
+        <p-button label="Get it as a Mozilla Add-on" size="large" icon="pi pi-download" />
+      </a>
+    </p>
+    <p class="muted">
+      Chromium and Chrome are not in a store at all, deliberately. Their install is below.
+    </p>
+  } @else {
+    <p-message severity="info" [closable]="false">
+      The Firefox add-on is not in Mozilla's catalogue yet. Until it is, install it from a build,
+      as below — the guided setup finds your browsers and does the rest.
+    </p-message>
+  }
+
+  <h2>Guided setup</h2>
+  <p>
+    The shortest route on any operating system. It finds the browsers installed on the machine,
+    identifies each one by the engine it ships rather than by its name, and asks which to install
+    into. Bash for Linux and macOS, PowerShell for Windows; neither needs anything else installed.
+  </p>
+  <pre><code>cd extensions
+./setup.sh              # Linux, macOS
+.\setup.ps1             # Windows</code></pre>
+  <p>
+    Pass <code>--dry-run</code> to see the plan without changing anything, <code>--update</code> to
+    refresh only what is older, and <code>--uninstall</code> to reverse it.
+  </p>
+
   <h2>Build it first</h2>
   <p>
     Every install path starts from a build. You need Rust 1.82 or newer and Node 20.11 or newer.
@@ -30,55 +66,13 @@ cargo build --release -p ratblocker-wasm --target wasm32-unknown-unknown
 cd extensions &amp;&amp; npm install &amp;&amp; node build.mjs</code></pre>
 
   <h2>Pick a platform</h2>
-  <p-tabs value="linux">
+  <p-tabs value="chromium">
     <p-tablist>
-      <p-tab value="linux">Linux</p-tab>
-      <p-tab value="chromium">Chromium</p-tab>
+      <p-tab value="chromium">Chromium &amp; Chrome</p-tab>
       <p-tab value="firefox">Firefox &amp; forks</p-tab>
     </p-tablist>
 
     <p-tabpanels>
-      <p-tabpanel value="linux">
-        <h3>The system daemon</h3>
-        <p>
-          Covers every application on the machine, not just the browser. It runs under its own
-          unprivileged account and answers DNS on <code>127.0.0.2:53</code>.
-        </p>
-        <pre><code>sudo bash linux/packaging/install.sh
-sudo systemctl enable --now ratblockerd
-ratblocker status</code></pre>
-
-        <p>
-          At this point the daemon is running but nothing is sending it queries. Routing the system
-          through it is a deliberate second step:
-        </p>
-        <pre><code>sudo systemctl enable --now ratblocker-dns</code></pre>
-
-        <p-message severity="info" [closable]="false">
-          The DNS redirection lives in its own unit so that stopping it restores your resolver
-          configuration, and so a reboot returns you to stock DNS even if something went wrong. The
-          drop-in it writes lives under <code>/run</code> for exactly that reason.
-        </p-message>
-
-        <h3>Driving it</h3>
-        <pre><code>ratblocker status            # what is loaded, and what it has blocked
-ratblocker pause 10m         # step out of the way for a bit
-ratblocker allow add news.example
-ratblocker update            # refresh the filter lists
-ratblocker filters list</code></pre>
-        <p>
-          Everything goes through D-Bus, and every change is authorized by Polkit in the daemon.
-          The command-line client holds no privileges of its own.
-        </p>
-
-        <h3>Removing it</h3>
-        <pre><code>sudo bash linux/packaging/uninstall.sh</code></pre>
-        <p class="muted">
-          Restores DNS first, then removes the files. Your configuration and rule database are left
-          behind on purpose; the script tells you how to delete them.
-        </p>
-      </p-tabpanel>
-
       <p-tabpanel value="chromium">
         <h3>Chromium, without the Web Store</h3>
         <p>

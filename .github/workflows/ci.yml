@@ -1,0 +1,76 @@
+name: Tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The setup scripts are two implementations of one specification, and the
+  # only way to know they still agree is to run the same tests against both.
+  # PowerShell is present on the Linux runner as well as the Windows one, so
+  # setup.ps1 is exercised twice and setup.sh on the platforms it targets.
+  setup-scripts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: extensions
+        run: npm ci
+
+      # The tests install into synthetic profiles, so packaged artefacts have
+      # to exist. Their contents do not matter here — only that they are files
+      # the scripts can find, copy, and read a version and an id out of. A real
+      # build is not run because none of these tests are about the extension.
+      - name: Provide packaged artefacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          printf 'not a real extension' > dist/ratblocker-firefox-0.1.0.xpi
+          printf 'not a real CRX' > dist/ratblocker-chromium.crx
+          printf '{}' > dist/mkkpcbjiinhopbipddkpjjaeffjmfnnb.json
+
+      - name: Run the tests
+        working-directory: extensions
+        run: node --test --test-concurrency=1 "tests/*.test.mjs"
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Typecheck
+        working-directory: extensions
+        run: |
+          npm ci
+          npm run typecheck
+
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - run: cargo test --release --workspace
