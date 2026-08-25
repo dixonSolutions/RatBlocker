@@ -31,14 +31,17 @@
     The whiskers are doing more work than they look. A tapered muzzle with a
     round ear reads just as easily as a bird — muzzle as beak, ear as skull —
     and no amount of reshaping the outline fixed that. Three strokes leaving
-    the snout settle it instantly. They fall below a pixel at 16px and simply
+    the snout settle it instantly. They originate just inside the muzzle near
+    the nose tip (10,74) so they read as growing from the nose, not floating
+    beside it; a start point even a few pixels out leaves a gap that reads as
+    a detached scribble. They fall below a pixel at 16px and simply
     disappear, which is fine: at that size the shield is carrying the mark.
   -->
   <g transform="translate(65 66) scale(0.64) translate(-58 -53)">
     <g stroke="#fff" stroke-width="4.5" stroke-linecap="round" fill="none">
-      <path d="M14 70 C 6 65, 1 61, -3 57"/>
-      <path d="M12 76 C 5 74, 0 73, -4 72"/>
-      <path d="M14 82 C 8 82, 4 81, 0 80"/>
+      <path d="M14 73 C 6 68, 0 63, -4 58"/>
+      <path d="M12 74 C 5 73, 0 73, -5 72"/>
+      <path d="M14 76 C 6 77, 0 78, -4 81"/>
     </g>
 
     <path fill="#fff" d="

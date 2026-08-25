@@ -103,22 +103,30 @@ license) lives in the `LISTING` constant in `sign-firefox.mjs` and is sent
 only on creation — afterwards the listing is edited on AMO itself, and the
 script must not quietly overwrite it.
 
-- **Icon.** AMO takes the icon from the XPI manifest, so the `icons` field in
-  `extensions/firefox/manifest.json` (16/32/48/128) is the listing icon. No
-  separate upload is needed; the assets in `extensions/shared/icons/` are
-  generated from `design/icon.svg` (see `design/README.md`).
+- **Icon.** The XPI manifest `icons` field (16/32/48/128 in
+  `extensions/firefox/manifest.json`) only covers the in-browser toolbar and
+  add-on management page. The **AMO listing icon** — the square mark AMO shows
+  in search results and on the add-on page — is a *separate* upload, exposed as
+  the `icon` field on the add-on (`PATCH /addons/addon/<id>/`), which AMO resizes
+  to 32/64/128. Without that upload the listing falls back to the generic
+  puzzle-piece icon, even though the XPI carries perfectly good icons.
+  `extensions/update-amo-listing.mjs` uploads `design/icon-512.png` (the
+  highest-resolution square source; the assets in `extensions/shared/icons/` are
+  generated from `design/icon.svg` — see `design/README.md`).
 - **Banner.** AMO has no banner slot, but it has preview screenshots.
   `extensions/update-amo-listing.mjs` uploads `design/preview-1280x800.png` (the
   banner centred on its own dark background, sized to AMO's preferred 1280x800)
-  as the first preview, which is what gives the listing a hero image. Run it
-  after a listed publish has created the entry:
+  as the first preview, which is what gives the listing a hero image.
 
-  ```sh
-  node extensions/update-amo-listing.mjs
-  ```
+`update-amo-listing.mjs` does both uploads, and both are idempotent — the icon
+`PATCH` replaces, and the preview step deletes any existing previews before
+uploading the current one — so the workflow runs it on every listed release
+(the "Decorate the listing" step) without stacking duplicate screenshots. By
+hand:
 
-  It is idempotent in the sense that re-running adds another preview; delete
-  extras on AMO if you need to.
+```sh
+node extensions/update-amo-listing.mjs
+```
 - **License.** The version's license is sent as a slug under the `version`
   object at creation time (see `VERSION_META` in `sign-firefox.mjs`). AMO exposes
   GPLv3 only as the builtin slug `GPL-3.0-only` — it has no `GPL-3.0-or-later`,
@@ -157,6 +165,12 @@ empty before approval.
   already has, run a normal push to bump past it.
 - **`update_url` is not allowed`** — only happens for listed builds; ensure
   `RATBLOCKER_CHANNEL=listed` is set at packaging (the workflow sets it).
+- **Listing shows the generic puzzle-piece icon** — the XPI manifest `icons`
+  only feed the in-browser toolbar, not the AMO listing. The listing icon is a
+  separate `icon` upload (`PATCH /addons/addon/<id>/`). The "Decorate the
+  listing" step does it; if it was skipped or failed, run
+  `node extensions/update-amo-listing.mjs` by hand. The resized 32/64/128 URLs
+  appear asynchronously, so the authenticated `icon_url` may lag a moment.
 - **`License with slug=… does not exist`** — AMO's license slugs are a fixed
   builtin set, not raw SPDX. GPLv3 is `GPL-3.0-only` (there is no `or-later`);
   LGPLv3 is `LGPL-3.0-only`; MPL is `MPL-2.0`. Inspect a comparable public

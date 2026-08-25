@@ -1,16 +1,23 @@
 /**
- * Decorate the RatBlocker AMO listing with the brand banner.
+ * Decorate the RatBlocker AMO listing: the store icon and the banner preview.
  *
  *   node update-amo-listing.mjs
  *
- * The icon is already carried by the XPI manifest, so AMO shows it with no
- * extra work. AMO has no "banner" slot, but it does have preview screenshots,
- * so the banner from `design/` is uploaded as the first preview — which is what
- * gives the listing a hero image.
+ * Two uploads, both things AMO will not take from the XPI on their own:
  *
- * Run this *after* a listed publish has created the add-on. It is idempotent in
- * the sense that re-running it adds another preview; delete extras on AMO if
- * you need to. Credentials are loaded the same way as `sign-firefox.mjs`.
+ *   - The **listing icon** is the square mark AMO shows in search results and on
+ *     the add-on page. AMO exposes it as a separate `icon` field on the add-on
+ *     (PATCH /addons/addon/<id>/), resized to 32/64/128. The XPI manifest
+ *     `icons` only cover the in-browser toolbar/management page, so without
+ *     this upload the AMO listing falls back to the generic puzzle piece.
+ *   - The **banner** has no AMO slot, but preview screenshots do, so the
+ *     1280x800 preview from `design/` is uploaded as the first preview — the
+ *     listing's hero image.
+ *
+ * Both are idempotent: the icon PATCH replaces, and the preview step deletes
+ * any existing previews before uploading, so this is safe to run from CI on
+ * every release. Run it *after* a listed publish has created the add-on.
+ * Credentials are loaded the same way as `sign-firefox.mjs`.
  */
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -21,6 +28,9 @@ import { credentials, call } from './amo.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '..');
 const dist = join(repo, 'dist');
+// AMO recommends a square PNG icon and resizes it to 32/64/128, so the
+// highest-resolution square source gives the sharpest small sizes.
+const icon = join(repo, 'design', 'icon-512.png');
 // AMO prefers 1280x800 screenshots; the banner is 1280x320, so the centred
 // preview is used when available. See design/README.md.
 const preview1280 = join(repo, 'design', 'preview-1280x800.png');
@@ -42,13 +52,31 @@ async function addonId() {
   return manifest.browser_specific_settings.gecko.id;
 }
 
-async function main() {
-  if (!existsSync(preview)) {
-    throw new Error(`preview not found: ${preview}`);
+/** PATCH the listing icon. AMO resizes it asynchronously to 32/64/128, so the
+ * returned icon_url may lag by a moment. Replacing is idempotent. */
+async function uploadIcon(id, creds) {
+  const form = new FormData();
+  form.append('icon', new Blob([await readFile(icon)]), 'icon-512.png');
+  const result = await call(
+    `/addons/addon/${encodeURIComponent(id)}/`,
+    { method: 'PATCH', body: form },
+    creds,
+  );
+  console.log('  icon uploaded', result.icon_url ?? '(pending async resize)');
+}
+
+/** Replace the banner preview so re-runs do not stack up duplicates: delete
+ * every existing preview, then upload the current one at position 1. */
+async function replacePreview(id, creds) {
+  const addon = await call(`/addons/addon/${encodeURIComponent(id)}/`, {}, creds);
+  for (const p of addon.previews ?? []) {
+    await call(
+      `/addons/addon/${encodeURIComponent(id)}/previews/${p.id}/`,
+      { method: 'DELETE' },
+      creds,
+    );
+    console.log(`  deleted old preview ${p.id}`);
   }
-  const creds = await credentials();
-  const id = await addonId();
-  console.log(`uploading preview for ${id}`);
 
   const form = new FormData();
   form.append('image', new Blob([await readFile(preview)]), 'preview.png');
@@ -60,6 +88,16 @@ async function main() {
   );
   console.log('  uploaded preview', result.id);
   console.log(`  ${result.image_url ?? '(image url pending async resize)'}`);
+}
+
+async function main() {
+  if (!existsSync(icon)) throw new Error(`icon not found: ${icon}`);
+  if (!existsSync(preview)) throw new Error(`preview not found: ${preview}`);
+  const creds = await credentials();
+  const id = await addonId();
+  console.log(`decorating AMO listing for ${id}`);
+  await uploadIcon(id, creds);
+  await replacePreview(id, creds);
 }
 
 await main();
