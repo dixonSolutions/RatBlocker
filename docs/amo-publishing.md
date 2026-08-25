@@ -119,10 +119,23 @@ script must not quietly overwrite it.
 
   It is idempotent in the sense that re-running adds another preview; delete
   extras on AMO if you need to.
+- **License.** The version's license is sent as a slug under the `version`
+  object at creation time (see `VERSION_META` in `sign-firefox.mjs`). AMO exposes
+  GPLv3 only as the builtin slug `GPL-3.0-only` — it has no `GPL-3.0-or-later`,
+  so that slug is used even though the repo's `LICENSE` is the "or-later" terms.
+  uBlock Origin and other GPL-3.0-or-later add-ons do the same. The `version`
+  object (holding `upload` + `license`) is mandatory at creation: AMO rejects a
+  create call that puts `upload` at the top level with
+  `{"version":["This field is required."]}`.
 
 After a listed submission, `sign-firefox.mjs` writes `dist/amo-listing.json`
 with the listing URL and slug, and the workflow commits a follow-up that
-points the site's install button at the real add-on.
+points the site's install button at the real add-on. The live listing is at
+<https://addons.mozilla.org/firefox/addon/ratblocker/>. A brand-new add-on
+sits in the `nominated` state until AMO review approves it; while nominated
+the public detail endpoint returns `{}` and only the authenticated endpoint
+shows the entry, so do not be alarmed if `curl`-ing the public URL comes back
+empty before approval.
 
 ## Two channels
 
@@ -144,6 +157,12 @@ points the site's install button at the real add-on.
   already has, run a normal push to bump past it.
 - **`update_url` is not allowed`** — only happens for listed builds; ensure
   `RATBLOCKER_CHANNEL=listed` is set at packaging (the workflow sets it).
+- **`License with slug=… does not exist`** — AMO's license slugs are a fixed
+  builtin set, not raw SPDX. GPLv3 is `GPL-3.0-only` (there is no `or-later`);
+  LGPLv3 is `LGPL-3.0-only`; MPL is `MPL-2.0`. Inspect a comparable public
+  add-on's `current_version.license.slug` to confirm a slug before sending it.
+- **`version: This field is required`** on create — the create call must nest
+  `upload` and `license` inside a top-level `version` object, not at the root.
 - **Bump commit did not land** — the bump step pushes with `GITHUB_TOKEN`;
   if it failed, the version was not recorded and the next run re-bumps to the
   same value. Re-run the workflow without `skip_bump`.
