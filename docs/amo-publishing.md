@@ -18,10 +18,14 @@ release: `core/`, `filter-compiler/`, `filter-lists/`, `extensions/`,
 `design/`, `Cargo.toml`, `Cargo.lock`, and the workflow file itself. Editing
 the site or docs does not publish.
 
-The version bump is committed back to `main` and tagged `v<version>` before
-the build, so the XPI that reaches AMO carries a version no previous release
-used and the next run starts from it. Pushes made with the auto-generated
-`GITHUB_TOKEN` do not re-trigger workflows, so the bump commit cannot loop.
+The version is bumped in the working tree before the build (so the XPI that
+reaches AMO carries a version no previous release used), but the bump is only
+committed back to `main` and tagged `v<version>` **after AMO accepts the
+upload**. Committing the tag only on success means a failed (or throttled)
+submit leaves no dangling tag, so re-running the job recomputes the same
+version and retries cleanly instead of colliding on an existing tag. Pushes
+made with the auto-generated `GITHUB_TOKEN` do not re-trigger workflows, so
+the release commit cannot loop.
 
 A manual run is still available through `workflow_dispatch`, with three inputs:
 
@@ -177,6 +181,10 @@ empty before approval.
   add-on's `current_version.license.slug` to confirm a slug before sending it.
 - **`version: This field is required`** on create — the create call must nest
   `upload` and `license` inside a top-level `version` object, not at the root.
-- **Bump commit did not land** — the bump step pushes with `GITHUB_TOKEN`;
-  if it failed, the version was not recorded and the next run re-bumps to the
-  same value. Re-run the workflow without `skip_bump`.
+- **Bump commit did not land** — the release commit + tag are pushed with
+  `GITHUB_TOKEN` only after a successful submit. If the submit failed, no tag
+  was created; just re-run the workflow (it recomputes the same version and
+  retries). If the submit succeeded but the commit failed, the version is on
+  AMO but not on `main`; run `node extensions/bump-version.mjs <version>`
+  with the published version and commit it by hand, then the next run bumps
+  past it.
