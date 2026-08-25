@@ -173,6 +173,18 @@ jobs:
           fi
           echo "listing: $url" >> "$GITHUB_STEP_SUMMARY"
 
+      # The store icon and banner are not taken from the XPI — AMO holds them
+      # as separate listing fields — so without this step the listing shows
+      # the generic puzzle-piece icon. Idempotent (the icon PATCH replaces;
+      # the preview step deletes old previews first), so it is safe every run.
+      - name: Decorate the listing
+        if: ${{ inputs.dry_run != true && (inputs.channel || 'listed') == 'listed' }}
+        working-directory: extensions
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: node update-amo-listing.mjs
+
       - uses: actions/upload-artifact@v4
         with:
           name: firefox-xpi
