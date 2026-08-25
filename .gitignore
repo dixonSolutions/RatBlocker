@@ -10,6 +10,8 @@ chromium-signing-key.pem
 *.pem
 !**/testdata/*.pem
 .amo-credentials
+.env
+.env.*
 
 # Editor and OS noise
 *.swp

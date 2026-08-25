@@ -291,9 +291,16 @@ async function packFirefox() {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
   // Same reasoning as Chromium: where to check for updates is a property of
-  // the distribution, not of the source tree.
+  // the distribution, not of the source tree. AMO forbids `update_url` on
+  // listed (Mozilla-hosted) add-ons — it serves updates itself — so the field
+  // is injected only for self-hosted (unlisted) packaging.
   const updateManifestUrl = `${UPDATE_BASE}/firefox-updates.json`;
-  manifest.browser_specific_settings.gecko.update_url = updateManifestUrl;
+  const selfHosted = process.env.RATBLOCKER_CHANNEL !== 'listed';
+  if (selfHosted) {
+    manifest.browser_specific_settings.gecko.update_url = updateManifestUrl;
+  } else {
+    delete manifest.browser_specific_settings.gecko.update_url;
+  }
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const xpi = join(dist, `ratblocker-firefox-${manifest.version}.xpi`);

@@ -1,11 +1,21 @@
 name: Publish to addons.mozilla.org
 
-# Publishing is deliberate, not automatic. A listed submission enters Mozilla's
-# review queue and is visible to the public, so it is triggered by cutting a
-# release or by asking for it by hand — never by an ordinary push.
+# A push to main is a release: the version is bumped, the extension built, and
+# the new version submitted to the public AMO catalogue. Manual runs are still
+# available through workflow_dispatch — for a dry-run validation pass or a
+# re-publish on demand.
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'filter-compiler/**'
+      - 'filter-lists/**'
+      - 'extensions/**'
+      - 'design/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '.github/workflows/publish-amo.yml'
   workflow_dispatch:
     inputs:
       channel:
@@ -15,7 +25,11 @@ on:
         default: listed
         required: true
       dry_run:
-        description: 'Build and validate without submitting anything'
+        description: 'Build and validate without submitting anything (no version bump either)'
+        type: boolean
+        default: false
+      skip_bump:
+        description: 'Publish the current version as-is instead of bumping first (rare; AMO rejects a duplicate version)'
         type: boolean
         default: false
 
@@ -31,6 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the version-bump commit can be pushed back to main.
+          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -46,6 +63,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # Bump the patch version and commit it back to main before building, so
+      # the XPI that reaches AMO carries a version no previous release used and
+      # the next run starts from this one. Pushes made with GITHUB_TOKEN do not
+      # re-trigger workflows, so this cannot loop.
+      - name: Bump version
+        if: ${{ inputs.dry_run != true && (github.event_name == 'push' || inputs.skip_bump != true) }}
+        id: bump
+        working-directory: extensions
+        run: |
+          next=$(node bump-version.mjs | tail -1 | awk '{print $2}')
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add extensions/firefox/manifest.json extensions/chromium/manifest.json extensions/package.json Cargo.toml
+          git commit -m "Release v$next [skip ci]"
+          git tag "v$next"
+          git push
+          git push --tags
 
       # The same build the site publishes, so what is submitted to Mozilla and
       # what is offered for a store-free install are the same artefact.
@@ -66,6 +102,7 @@ jobs:
         working-directory: extensions
         env:
           RATBLOCKER_UPDATE_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/downloads
+          RATBLOCKER_CHANNEL: ${{ inputs.channel || 'listed' }}
         run: |
           npm ci
           npm run typecheck
@@ -74,17 +111,22 @@ jobs:
           node package.mjs firefox
 
       # A submission cannot be taken back, so the artefact is checked before
-      # anything leaves the runner.
-      - name: Check what would be submitted
+      # anything leaves the runner. web-ext lint mirrors what AMO's validator
+      # will do, so a failure here is a failure there.
+      - name: Lint with web-ext
         working-directory: extensions
         run: |
+          npx --yes web-ext lint --source-dir firefox/build
           xpi=$(ls ../dist/ratblocker-firefox-*.xpi | tail -1)
           echo "would submit: $xpi ($(du -h "$xpi" | cut -f1))"
           node -e "
             const m = require('./firefox/build/manifest.json');
             console.log('id      ', m.browser_specific_settings.gecko.id);
             console.log('version ', m.version);
+            console.log('channel ', process.env.RATBLOCKER_CHANNEL);
           "
+        env:
+          RATBLOCKER_CHANNEL: ${{ inputs.channel || 'listed' }}
 
       - name: Submit to AMO
         if: ${{ inputs.dry_run != true }}
