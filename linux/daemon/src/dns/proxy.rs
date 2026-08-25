@@ -40,6 +40,25 @@ fn source_allowed(addr: &SocketAddr) -> bool {
     }
 }
 
+/// Send a query upstream, re-reading the machine's resolvers if none answer.
+///
+/// Every upstream failing is what a network change looks like from here: a VPN
+/// coming up replaces the machine's resolvers and, with a kill switch,
+/// firewalls off the ones RatBlocker was using. Checking at the point of
+/// failure is what makes the query that noticed also the query that recovers,
+/// instead of leaving the machine without DNS until the next poll.
+async fn forward(state: &Arc<DaemonState>, request: &[u8]) -> Result<Vec<u8>> {
+    match state.resolver.resolve(request).await {
+        Ok(response) => Ok(response),
+        Err(error) => {
+            if !state.refresh_upstreams() {
+                return Err(error);
+            }
+            state.resolver.resolve(request).await
+        }
+    }
+}
+
 /// Handle one query and produce the bytes to send back.
 async fn handle(state: &Arc<DaemonState>, request: &[u8], source: SocketAddr) -> Option<Vec<u8>> {
     state.counters.queries.fetch_add(1, Ordering::Relaxed);
@@ -93,7 +112,7 @@ async fn handle(state: &Arc<DaemonState>, request: &[u8], source: SocketAddr) ->
     }
 
     // 3. Forward.
-    match state.resolver.resolve(request).await {
+    match forward(state, request).await {
         Ok(response) => {
             state.counters.forwarded.fetch_add(1, Ordering::Relaxed);
             let ttl = message::minimum_ttl(

@@ -8,7 +8,7 @@ use clap::Parser;
 use ratblocker_daemon::config::DaemonSettings;
 use ratblocker_daemon::dbus::{Service, OBJECT_PATH, SERVICE_NAME};
 use ratblocker_daemon::dns::cache::Cache;
-use ratblocker_daemon::dns::{proxy, upstream::Resolver};
+use ratblocker_daemon::dns::{proxy, upstream, upstream::Resolver};
 use ratblocker_daemon::state::DaemonState;
 use ratblocker_daemon::updater::Updater;
 use tracing_subscriber::EnvFilter;
@@ -108,6 +108,22 @@ async fn main() -> Result<()> {
         tokio::spawn(async move {
             if let Ok(Err(error)) = tcp.await {
                 tracing::error!(error = format!("{error:#}"), "TCP listener stopped");
+            }
+        });
+    }
+
+    // Follow the machine's own resolvers while they move under us. A VPN or a
+    // change of network replaces them, and a proxy still pointed at the
+    // previous set answers nothing — so this is what keeps DNS working across
+    // a VPN connecting rather than breaking the moment the tunnel comes up.
+    if state.resolver.follows_system() {
+        let state = state.clone();
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(upstream::SYSTEM_POLL_INTERVAL);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                ticker.tick().await;
+                state.refresh_upstreams();
             }
         });
     }

@@ -75,6 +75,22 @@ impl DaemonState {
         }
     }
 
+    /// Follow the machine's resolvers if they have changed, and drop anything
+    /// learned from the network they replaced. Returns true when they changed.
+    ///
+    /// The cache has to go with them: a lease from the previous network can be
+    /// a split-horizon answer, a captive portal's answer, or simply an address
+    /// that is no longer reachable through the tunnel that just came up.
+    pub fn refresh_upstreams(&self) -> bool {
+        if !self.resolver.refresh() {
+            return false;
+        }
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.clear();
+        }
+        true
+    }
+
     /// A handle on the current engine. Cheap: one lock and an `Arc` clone.
     pub fn engine(&self) -> Arc<Engine> {
         self.engine
